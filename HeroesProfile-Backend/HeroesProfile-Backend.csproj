@@ -99,5 +99,15 @@
     <None Include="App.config" />
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HotsApiJSON\HotsApiJSON.csproj">
+      <Project>{ccb4ef3a-7174-4b7e-accc-a31fbfc03854}</Project>
+      <Name>HotsApiJSON</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\LambdaJson\LambdaJson.csproj">
+      <Project>{0921d20c-9cbd-4d33-93b5-2936a98c170d}</Project>
+      <Name>LambdaJson</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -12,158 +12,158 @@ using System.IO;
 using System.Text.RegularExpressions;
 namespace HeroesProfile_Backend
 {
-    class GrabHotsAPIData
+    class GrabHotsApiData
     {
-        private string db_connect_string = new DB_Connect().heroesprofile_config;
-        private Dictionary<string, string> heroes = new Dictionary<string, string>();
-        private Dictionary<string, string> heroes_translations = new Dictionary<string, string>();
-        private Dictionary<string, string> heroes_alt = new Dictionary<string, string>();
-        private Dictionary<string, string> heroes_attr = new Dictionary<string, string>();
-        private Dictionary<string, string> role = new Dictionary<string, string>();
-        private Dictionary<string, string> maps = new Dictionary<string, string>();
-        private Dictionary<string, string> maps_short = new Dictionary<string, string>();
-        private Dictionary<string, string> maps_translations = new Dictionary<string, string>();
-        private Dictionary<string, string> game_types = new Dictionary<string, string>();
-        private Dictionary<string, string> talents = new Dictionary<string, string>();
-        private Dictionary<string, string> mmr_ids = new Dictionary<string, string>();
-        private Dictionary<string, string> league_tiers = new Dictionary<string, string>();
-        private Dictionary<string, DateTime[]> seasons = new Dictionary<string, DateTime[]>();
-        private Dictionary<string, string> seasons_game_versions = new Dictionary<string, string>();
-        private Dictionary<string, ReplaysNotProcessed> notProcessedReplays = new Dictionary<string, ReplaysNotProcessed>();
+        private string _dbConnectString = new DB_Connect().heroesprofile_config;
+        private Dictionary<string, string> _heroes = new Dictionary<string, string>();
+        private Dictionary<string, string> _heroesTranslations = new Dictionary<string, string>();
+        private Dictionary<string, string> _heroesAlt = new Dictionary<string, string>();
+        private Dictionary<string, string> _heroesAttr = new Dictionary<string, string>();
+        private Dictionary<string, string> _role = new Dictionary<string, string>();
+        private Dictionary<string, string> _maps = new Dictionary<string, string>();
+        private Dictionary<string, string> _mapsShort = new Dictionary<string, string>();
+        private Dictionary<string, string> _mapsTranslations = new Dictionary<string, string>();
+        private Dictionary<string, string> _gameTypes = new Dictionary<string, string>();
+        private Dictionary<string, string> _talents = new Dictionary<string, string>();
+        private Dictionary<string, string> _mmrIds = new Dictionary<string, string>();
+        private Dictionary<string, string> _leagueTiers = new Dictionary<string, string>();
+        private Dictionary<string, DateTime[]> _seasons = new Dictionary<string, DateTime[]>();
+        private Dictionary<string, string> _seasonsGameVersions = new Dictionary<string, string>();
+        private Dictionary<string, ReplaysNotProcessed> _notProcessedReplays = new Dictionary<string, ReplaysNotProcessed>();
 
-        private Dictionary<long, HotsApiJSON.ReplayData> replays_to_run = new Dictionary<long, HotsApiJSON.ReplayData>();
+        private Dictionary<long, HotsApiJSON.ReplayData> _replaysToRun = new Dictionary<long, HotsApiJSON.ReplayData>();
 
 
 
-        private ConcurrentDictionary<long, ParseStormReplay> replayData_grabbed = new ConcurrentDictionary<long, ParseStormReplay>();
+        private ConcurrentDictionary<long, ParseStormReplay> _replayDataGrabbed = new ConcurrentDictionary<long, ParseStormReplay>();
 
-        public GrabHotsAPIData()
+        public GrabHotsApiData()
         {
-            int maxValue = 0;
-            using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+            var maxValue = 0;
+            using (var conn = new MySqlConnection(_dbConnectString))
             {
                 conn.Open();
 
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT tier_id, name FROM league_tiers";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
-                    while (Reader.Read())
+                    while (reader.Read())
                     {
-                        league_tiers.Add(Reader.GetString("name"), Reader.GetString("tier_id"));
+                        _leagueTiers.Add(reader.GetString("name"), reader.GetString("tier_id"));
                     }
                 }
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT id, name, new_role FROM heroes";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
-                    while (Reader.Read())
+                    while (reader.Read())
                     {
-                        heroes.Add(Reader.GetString("name"), Reader.GetString("id"));
-                        role.Add(Reader.GetString("name"), Reader.GetString("new_role"));
+                        _heroes.Add(reader.GetString("name"), reader.GetString("id"));
+                        _role.Add(reader.GetString("name"), reader.GetString("new_role"));
                     }
                 }
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT type_id, name FROM game_types";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
-                    while (Reader.Read())
+                    while (reader.Read())
                     {
-                        game_types.Add(Reader.GetString("name").Replace(" ", ""), Reader.GetString("type_id"));
+                        _gameTypes.Add(reader.GetString("name").Replace(" ", ""), reader.GetString("type_id"));
                     }
                 }
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT * FROM heroesprofile.heroes_translations;";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
-                    while (Reader.Read())
+                    while (reader.Read())
                     {
-                        if (!heroes_translations.ContainsKey(Reader.GetString("translation").ToLower()))
+                        if (!_heroesTranslations.ContainsKey(reader.GetString("translation").ToLower()))
                         {
-                            heroes_translations.Add(Reader.GetString("translation").ToLower(), Reader.GetString("name"));
+                            _heroesTranslations.Add(reader.GetString("translation").ToLower(), reader.GetString("name"));
 
                         }
                     }
                 }
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT map_id, name, short_name FROM maps";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
-                    while (Reader.Read())
+                    while (reader.Read())
                     {
-                        maps.Add(Reader.GetString("name"), Reader.GetString("map_id"));
-                        maps_short.Add(Reader.GetString("short_name"), Reader.GetString("name"));
+                        _maps.Add(reader.GetString("name"), reader.GetString("map_id"));
+                        _mapsShort.Add(reader.GetString("short_name"), reader.GetString("name"));
 
                     }
                 }
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT name, translation FROM maps_translations";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
-                    while (Reader.Read())
+                    while (reader.Read())
                     {
-                        maps_translations.Add(Reader.GetString("translation"), Reader.GetString("name"));
+                        _mapsTranslations.Add(reader.GetString("translation"), reader.GetString("name"));
                     }
                 }
 
 
 
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT hero_name, talent_id, talent_name FROM heroes_data_talents order by talent_id asc";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
-                    while (Reader.Read())
+                    while (reader.Read())
                     {
-                        string hero = Reader.GetString("hero_name");
-                        string talent = Reader.GetString("talent_name");
-                        string[] split = Regex.Split(talent, @"(?<!^)(?=[A-Z])");
+                        var hero = reader.GetString("hero_name");
+                        var talent = reader.GetString("talent_name");
+                        var split = Regex.Split(talent, @"(?<!^)(?=[A-Z])");
 
                         if (hero == "" && split.Length > 0)
                         {
                             hero = split[0];
                         }
-                        if (!talents.ContainsKey(Reader.GetString("hero_name") + "|" + Reader.GetString("talent_name")))
+                        if (!_talents.ContainsKey(reader.GetString("hero_name") + "|" + reader.GetString("talent_name")))
                         {
-                            talents.Add(Reader.GetString("hero_name") + "|" + Reader.GetString("talent_name"), Reader.GetString("talent_id"));
+                            _talents.Add(reader.GetString("hero_name") + "|" + reader.GetString("talent_name"), reader.GetString("talent_id"));
 
                         }
                     }
                 }
 
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT name, alt_name, short_name, attribute_id FROM heroes";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
-                    while (Reader.Read())
+                    while (reader.Read())
                     {
-                        if (!heroes_alt.ContainsKey(Reader.GetString("name")))
+                        if (!_heroesAlt.ContainsKey(reader.GetString("name")))
                         {
-                            string hero = Reader.GetString("name");
-                            string alt = Reader["alt_name"].Equals(DBNull.Value) ? String.Empty : Reader.GetString("alt_name");
+                            var hero = reader.GetString("name");
+                            var alt = reader["alt_name"].Equals(DBNull.Value) ? string.Empty : reader.GetString("alt_name");
 
                             if (alt == "")
                             {
-                                alt = Reader.GetString("short_name");
+                                alt = reader.GetString("short_name");
                                 alt = char.ToUpper(alt.First()) + alt.Substring(1).ToLower();
 
                             }
-                            heroes_alt.Add(alt, hero);
+                            _heroesAlt.Add(alt, hero);
 
-                            heroes_attr.Add(Reader.GetString("attribute_id"), Reader.GetString("name"));
+                            _heroesAttr.Add(reader.GetString("attribute_id"), reader.GetString("name"));
                         }
                     }
                 }
@@ -171,67 +171,65 @@ namespace HeroesProfile_Backend
 
 
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT mmr_type_id, name FROM mmr_type_ids";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
-                    while (Reader.Read())
+                    while (reader.Read())
                     {
-                        mmr_ids.Add(Reader.GetString("name"), Reader.GetString("mmr_type_id"));
+                        _mmrIds.Add(reader.GetString("name"), reader.GetString("mmr_type_id"));
                     }
                 }
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT id, start_date, end_date FROM season_dates;";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
 
-                    while (Reader.Read())
+                    while (reader.Read())
                     {
-                        DateTime[] dates = new DateTime[2];
+                        var dates = new DateTime[2];
 
-                        dates[0] = DateTime.Parse(Reader.GetString("start_date"));
-                        dates[1] = DateTime.Parse(Reader.GetString("end_date"));
+                        dates[0] = DateTime.Parse(reader.GetString("start_date"));
+                        dates[1] = DateTime.Parse(reader.GetString("end_date"));
 
 
-                        seasons.Add(Reader.GetString("id"), dates);
+                        _seasons.Add(reader.GetString("id"), dates);
                     }
                 }
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
 
                     cmd.CommandText = "SELECT * FROM replays_not_processed WHERE count_parsed < 3 ORDER BY replayID ASC LIMIT 100";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
-                    while (Reader.Read())
+                    while (reader.Read())
                     {
-                        string replayID = Reader["replayID"].Equals(DBNull.Value) ? String.Empty : Reader.GetString("replayID");
-                        if ((Reader["replayID"].Equals(DBNull.Value) ? String.Empty : Reader.GetString("replayID")) != "")
+                        var replayId = reader["replayID"].Equals(DBNull.Value) ? string.Empty : reader.GetString("replayID");
+                        if ((reader["replayID"].Equals(DBNull.Value) ? string.Empty : reader.GetString("replayID")) != "")
                         {
 
-                            ReplaysNotProcessed ron = new ReplaysNotProcessed();
+                            var ron = new ReplaysNotProcessed
+                            {
+                                    replayID = reader.GetString("replayID"),
+                                    region = reader.GetString("region"),
+                                    game_type = reader.GetString("game_type"),
+                                    game_length = reader.GetString("game_length"),
+                                    game_date = reader.GetString("game_date"),
+                                    game_map = reader.GetString("game_map"),
+                                    game_version = reader.GetString("game_version"),
+                                    size = reader["size"].Equals(DBNull.Value) ? string.Empty : reader.GetString("size"),
+                                    date_parsed = reader["date_parsed"].Equals(DBNull.Value) ? string.Empty : reader.GetString("date_parsed"),
+                                    count_parsed = reader.GetString("count_parsed"),
+                                    url = reader.GetString("url"),
+                                    failure_status = reader["failure_status"].Equals(DBNull.Value) ? string.Empty : reader.GetString("failure_status"),
+                                    processed = reader.GetString("processed")
+                            };
 
-                            ron.replayID = Reader.GetString("replayID");
-                            ron.region = Reader.GetString("region");
-                            ron.game_type = Reader.GetString("game_type");
-                            ron.game_length = Reader.GetString("game_length");
-                            ron.game_date = Reader.GetString("game_date");
-                            ron.game_map = Reader.GetString("game_map");
-                            ron.game_version = Reader.GetString("game_version");
-                            ron.size = Reader["size"].Equals(DBNull.Value) ? String.Empty : Reader.GetString("size");
-                            ron.date_parsed = Reader["date_parsed"].Equals(DBNull.Value) ? String.Empty : Reader.GetString("date_parsed");
-                            ron.count_parsed = Reader.GetString("count_parsed");
-                            ron.url = Reader.GetString("url");
-                            ron.failure_status = Reader["failure_status"].Equals(DBNull.Value) ? String.Empty : Reader.GetString("failure_status");
-                            ron.processed = Reader.GetString("processed");
-
-
-
-
-                            notProcessedReplays.Add(replayID, ron);
+                            _notProcessedReplays.Add(replayId, ron);
 
                         }
 
@@ -239,90 +237,87 @@ namespace HeroesProfile_Backend
                 }
 
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT season, game_version FROM season_game_versions";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
-                    while (Reader.Read())
+                    while (reader.Read())
                     {
-                        if (!seasons_game_versions.ContainsKey(Reader.GetString("game_version")))
+                        if (!_seasonsGameVersions.ContainsKey(reader.GetString("game_version")))
                         {
-                            seasons_game_versions.Add(Reader.GetString("game_version"), Reader.GetString("season"));
+                            _seasonsGameVersions.Add(reader.GetString("game_version"), reader.GetString("season"));
 
                         }
                     }
                 }
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT MAX(replayID) as max_replayID FROM replay";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
-                    while (Reader.Read())
+                    while (reader.Read())
                     {
-                        maxValue = Convert.ToInt32(Reader.GetString("max_replayID"));
+                        maxValue = Convert.ToInt32(reader.GetString("max_replayID"));
                     }
                 }
-                runNotProccessed();
+                RunNotProcessed();
 
 
-                int not_processed_maxValue = 0;
+                var notProcessedMaxValue = 0;
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT MAX(replayID) as max_replayID FROM replays_not_processed";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
-                    if (Reader.HasRows)
+                    if (reader.HasRows)
                     {
-                        while (Reader.Read())
+                        while (reader.Read())
                         {
-                            string value = Reader["max_replayID"].Equals(DBNull.Value) ? String.Empty : Reader.GetString("max_replayID");
+                            var value = reader["max_replayID"].Equals(DBNull.Value) ? string.Empty : reader.GetString("max_replayID");
                             if (value != "")
                             {
-                                not_processed_maxValue = Convert.ToInt32(Reader.GetString("max_replayID"));
-
+                                notProcessedMaxValue = Convert.ToInt32(reader.GetString("max_replayID"));
                             }
                         }
                     }
-
                 }
-                int brawl_maxValue = 0;
-                using (MySqlCommand cmd = conn.CreateCommand())
+                var brawlMaxValue = 0;
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT if(MAX(replayID) is null, 0, MAX(replayID)) as max_replayID FROM heroesprofile_brawl.replay";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var reader = cmd.ExecuteReader();
 
-                    while (Reader.Read())
+                    while (reader.Read())
                     {
-                        brawl_maxValue = Convert.ToInt32(Reader.GetString("max_replayID"));
+                        brawlMaxValue = Convert.ToInt32(reader.GetString("max_replayID"));
                     }
                 }
-
 
                 maxValue++;
-                if (not_processed_maxValue > maxValue)
+                if (notProcessedMaxValue > maxValue)
                 {
-                    maxValue = not_processed_maxValue;
+                    maxValue = notProcessedMaxValue;
 
-                    if (brawl_maxValue > maxValue)
+                    if (brawlMaxValue > maxValue)
                     {
-                        maxValue = brawl_maxValue;
+                        maxValue = brawlMaxValue;
                     }
                 }
-                else if (brawl_maxValue > maxValue)
+                else if (brawlMaxValue > maxValue)
                 {
-                    maxValue = (brawl_maxValue + 1);
+                    maxValue = (brawlMaxValue + 1);
                 }
                 //maxValue = 15757424;
-                recurseHotsApiCall(maxValue);
+                RecurseHotsApiCall(maxValue);
             }
         }
-        private void runNotProccessed()
+        private void RunNotProcessed()
         {
             Parallel.ForEach(
-                notProcessedReplays.Keys,
+                _notProcessedReplays.Keys,
                 //new ParallelOptions { MaxDegreeOfParallelism = -1 },
                 //new ParallelOptions { MaxDegreeOfParallelism = 1 },
                 new ParallelOptions { MaxDegreeOfParallelism = 100 },
@@ -330,41 +325,41 @@ namespace HeroesProfile_Backend
                 {
                     //
                     Console.WriteLine("Running Reply: " + item);
-                    ParseStormReplay p = new ParseStormReplay(Convert.ToInt64(item), new Uri(notProcessedReplays[item].url, UriKind.Absolute), notProcessedReplays[item], maps, maps_translations, game_types, talents, seasons_game_versions, mmr_ids, seasons, heroes, heroes_translations, maps_short, mmr_ids, role, heroes_attr);
-                    replayData_grabbed.TryAdd(Convert.ToInt64(item), p);
+                    var p = new ParseStormReplay(Convert.ToInt64(item), new Uri(_notProcessedReplays[item].url, UriKind.Absolute), _notProcessedReplays[item], _maps, _mapsTranslations, _gameTypes, _talents, _seasonsGameVersions, _mmrIds, _seasons, _heroes, _heroesTranslations, _mapsShort, _mmrIds, _role, _heroesAttr);
+                    _replayDataGrabbed.TryAdd(Convert.ToInt64(item), p);
 
                 });
 
-            SortedDictionary<long, ParseStormReplay> sorted_replayData_grabbed = new SortedDictionary<long, ParseStormReplay>();
+            var sortedReplayDataGrabbed = new SortedDictionary<long, ParseStormReplay>();
 
-            foreach (var item in replayData_grabbed.Keys)
+            foreach (var item in _replayDataGrabbed.Keys)
             {
-                sorted_replayData_grabbed.Add(item, replayData_grabbed[item]);
+                sortedReplayDataGrabbed.Add(item, _replayDataGrabbed[item]);
             }
 
             Parallel.ForEach(
-                sorted_replayData_grabbed.Keys,
+                sortedReplayDataGrabbed.Keys,
                 //new ParallelOptions { MaxDegreeOfParallelism = -1 },
                 //new ParallelOptions { MaxDegreeOfParallelism = 1 },
                 new ParallelOptions { MaxDegreeOfParallelism = 1 },
                 item =>
                 {
-                    if (sorted_replayData_grabbed[item] != null)
+                    if (sortedReplayDataGrabbed[item] != null)
                     {
-                        if (!sorted_replayData_grabbed[item].dupe)
+                        if (!sortedReplayDataGrabbed[item].dupe)
                         {
-                            if (sorted_replayData_grabbed[item].overallData != null)
+                            if (sortedReplayDataGrabbed[item].overallData != null)
                             {
-                                if (sorted_replayData_grabbed[item].overallData.Mode != null)
+                                if (sortedReplayDataGrabbed[item].overallData.Mode != null)
                                 {
                                     Console.WriteLine("Saving replay data for: " + item);
-                                    if (sorted_replayData_grabbed[item].overallData.Mode != "Brawl")
+                                    if (sortedReplayDataGrabbed[item].overallData.Mode != "Brawl")
                                     {
-                                        sorted_replayData_grabbed[item].saveReplayData(sorted_replayData_grabbed[item].overallData);
+                                        sortedReplayDataGrabbed[item].saveReplayData(sortedReplayDataGrabbed[item].overallData);
                                     }
                                     else
                                     {
-                                        sorted_replayData_grabbed[item].saveReplayDataBrawl(sorted_replayData_grabbed[item].overallData);
+                                        sortedReplayDataGrabbed[item].saveReplayDataBrawl(sortedReplayDataGrabbed[item].overallData);
 
                                     }
                                 }
@@ -407,19 +402,19 @@ namespace HeroesProfile_Backend
             */
 
         }
-        private void recurseHotsApiCall(int maxValue)
+        private void RecurseHotsApiCall(int maxValue)
         {
             try
             {
-                string jsonString = "";
+                var jsonString = "";
                 Console.WriteLine("Grabbing Replay Data from HotsApi for replayID: " + maxValue);
-                string url = @"https://hotsapi.net/api/v1/replays?min_id=" + maxValue;
-                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+                var url = @"https://hotsapi.net/api/v1/replays?min_id=" + maxValue;
+                var request = (HttpWebRequest)WebRequest.Create(url);
                 request.AutomaticDecompression = DecompressionMethods.GZip;
 
-                using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
-                using (Stream stream = response.GetResponseStream())
-                using (StreamReader reader = new StreamReader(stream))
+                using (var response = (HttpWebResponse)request.GetResponse())
+                using (var stream = response.GetResponseStream())
+                using (var reader = new StreamReader(stream))
                 {
 
                     jsonString = reader.ReadToEnd();
@@ -427,14 +422,14 @@ namespace HeroesProfile_Backend
                 }
                 //jsonString = "[" + jsonString + ",{}]";
                 Console.WriteLine(jsonString);
-                HotsApiJSON.ReplayData[] data = HotsApiJSON.ReplayData.FromJson(jsonString);
+                var data = HotsApiJSON.ReplayData.FromJson(jsonString);
 
-                int counter = 0;
-                for (int i = 0; i < data.Length; i++)
+                var counter = 0;
+                foreach (var t in data)
                 {
                     //if (data[i].GameType != "Brawl")
                     //{
-                    replays_to_run.Add(data[i].Id, data[i]);
+                    _replaysToRun.Add(t.Id, t);
                     counter++;
 
                     // }
@@ -443,54 +438,52 @@ namespace HeroesProfile_Backend
                     {
                         break;
                     }
-
-
                 }
-                int replays_left_counter = replays_to_run.Count;
+                var replaysLeftCounter = _replaysToRun.Count;
                 Parallel.ForEach(
-                replays_to_run.Keys,
+                _replaysToRun.Keys,
                 //new ParallelOptions { MaxDegreeOfParallelism = -1 },
                 //new ParallelOptions { MaxDegreeOfParallelism = 1 },
                 new ParallelOptions { MaxDegreeOfParallelism = 100 },
                 item =>
                 {
-                    replays_left_counter--;
+                    replaysLeftCounter--;
 
-                    Console.WriteLine("Running Reply: " + item + " - " + replays_left_counter + " left to run");
-                    ParseStormReplay p = new ParseStormReplay(item, replays_to_run[item].Url, replays_to_run[item], maps, maps_translations, game_types, talents, seasons_game_versions, mmr_ids, seasons, heroes, heroes_translations, maps_short, mmr_ids, role, heroes_attr);
-                    replayData_grabbed.TryAdd(item, p);
+                    Console.WriteLine("Running Reply: " + item + " - " + replaysLeftCounter + " left to run");
+                    var p = new ParseStormReplay(item, _replaysToRun[item].Url, _replaysToRun[item], _maps, _mapsTranslations, _gameTypes, _talents, _seasonsGameVersions, _mmrIds, _seasons, _heroes, _heroesTranslations, _mapsShort, _mmrIds, _role, _heroesAttr);
+                    _replayDataGrabbed.TryAdd(item, p);
                 });
-                SortedDictionary<long, ParseStormReplay> sorted_replayData_grabbed = new SortedDictionary<long, ParseStormReplay>();
+                var sortedReplayDataGrabbed = new SortedDictionary<long, ParseStormReplay>();
 
-                foreach (var item in replayData_grabbed.Keys)
+                foreach (var item in _replayDataGrabbed.Keys)
                 {
-                    sorted_replayData_grabbed.Add(item, replayData_grabbed[item]);
+                    sortedReplayDataGrabbed.Add(item, _replayDataGrabbed[item]);
                 }
 
 
                 Parallel.ForEach(
-                    sorted_replayData_grabbed.Keys,
+                    sortedReplayDataGrabbed.Keys,
                     //new ParallelOptions { MaxDegreeOfParallelism = -1 },
                     //new ParallelOptions { MaxDegreeOfParallelism = 1 },
                     new ParallelOptions { MaxDegreeOfParallelism = 1 },
                     item =>
                     {
-                        if (sorted_replayData_grabbed[item] != null)
+                        if (sortedReplayDataGrabbed[item] != null)
                         {
-                            if (!sorted_replayData_grabbed[item].dupe)
+                            if (!sortedReplayDataGrabbed[item].dupe)
                             {
-                                if (sorted_replayData_grabbed[item].overallData != null)
+                                if (sortedReplayDataGrabbed[item].overallData != null)
                                 {
-                                    if (sorted_replayData_grabbed[item].overallData.Mode != null)
+                                    if (sortedReplayDataGrabbed[item].overallData.Mode != null)
                                     {
                                         Console.WriteLine("Saving replay data for: " + item);
-                                        if (sorted_replayData_grabbed[item].overallData.Mode != "Brawl")
+                                        if (sortedReplayDataGrabbed[item].overallData.Mode != "Brawl")
                                         {
-                                            sorted_replayData_grabbed[item].saveReplayData(sorted_replayData_grabbed[item].overallData);
+                                            sortedReplayDataGrabbed[item].saveReplayData(sortedReplayDataGrabbed[item].overallData);
                                         }
                                         else
                                         {
-                                            sorted_replayData_grabbed[item].saveReplayDataBrawl(sorted_replayData_grabbed[item].overallData);
+                                            sortedReplayDataGrabbed[item].saveReplayDataBrawl(sortedReplayDataGrabbed[item].overallData);
 
                                         }
                                     }
@@ -533,7 +526,7 @@ namespace HeroesProfile_Backend
                 {
                     Console.WriteLine("Too many requests  - Sleeping for 10 seconds");
                     System.Threading.Thread.Sleep(10000);
-                    recurseHotsApiCall(maxValue);
+                    RecurseHotsApiCall(maxValue);
                 }
             }
 

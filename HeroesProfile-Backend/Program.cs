@@ -16,7 +16,7 @@ namespace HeroesProfile_Backend
             {
                 try
                 {
-                    GrabHotsAPIData data = new GrabHotsAPIData();
+                    var data = new GrabHotsApiData();
 
                 }
                 catch (Exception e)

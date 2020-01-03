@@ -55,12 +55,12 @@ namespace HeroesProfile_Backend
             this.maps_short = maps_short;
             this.heroes = heroes;
             this.mmr_ids = mmrs;
-            this.role = roles;
+            role = roles;
             this.heroes_attr = heroes_attr;
 
             try
             {
-                string globalJson = "";
+                var globalJson = "";
                 var httpWebRequest = (HttpWebRequest)WebRequest.Create("https://a73l75cbzg.execute-api.eu-west-1.amazonaws.com/default/parse-hots");
 
                 httpWebRequest.Method = "POST";
@@ -68,7 +68,7 @@ namespace HeroesProfile_Backend
 
                 using (var streamWriter = new StreamWriter(httpWebRequest.GetRequestStream()))
                 {
-                    string json = new JavaScriptSerializer().Serialize(new
+                    var json = new JavaScriptSerializer().Serialize(new
                     {
                         //input = "http://hotsapi.s3-website-eu-west-1.amazonaws.com/c5a49c21-d3d0-c8d9-c904-b3d09feea5e9.StormReplay",
                         input = replayURL,
@@ -91,10 +91,10 @@ namespace HeroesProfile_Backend
 
                 if (Regex.Match(result, "Error parsing replay: UnexpectedResult").Success)
                 {
-                    using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                    using (var conn = new MySqlConnection(db_connect_string))
                     {
                         conn.Open();
-                        using (MySqlCommand cmd = conn.CreateCommand())
+                        using (var cmd = conn.CreateCommand())
                         {
                             cmd.CommandText = "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                                 replayID + "," +
@@ -111,16 +111,16 @@ namespace HeroesProfile_Backend
                                                 "\"" + replayURL + "\"" + "," +
                                                 "\"" + hotsapi_data.Processed + "\"" + "," +
                                                 "\"" + "Error parsing replay: UnexpectedResult" + "\"" + ")";
-                            MySqlDataReader Reader = cmd.ExecuteReader();
+                            var Reader = cmd.ExecuteReader();
                         }
                     }
                 }
                 else if (Regex.Match(result, "Error parsing replay: SuccessReplayDetail").Success)
                 {
-                    using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                    using (var conn = new MySqlConnection(db_connect_string))
                     {
                         conn.Open();
-                        using (MySqlCommand cmd = conn.CreateCommand())
+                        using (var cmd = conn.CreateCommand())
                         {
                             cmd.CommandText = "INSERT IGNORE INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                                 replayID + "," +
@@ -137,16 +137,16 @@ namespace HeroesProfile_Backend
                                                 "\"" + replayURL + "\"" + "," +
                                                 "\"" + hotsapi_data.Processed + "\"" + "," +
                                                 "\"" + "Error parsing replay: SuccessReplayDetail" + "\"" + ")";
-                            MySqlDataReader Reader = cmd.ExecuteReader();
+                            var Reader = cmd.ExecuteReader();
                         }
                     }
                 }
                 else if (Regex.Match(result, "Error parsing replay: ParserException").Success)
                 {
-                    using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                    using (var conn = new MySqlConnection(db_connect_string))
                     {
                         conn.Open();
-                        using (MySqlCommand cmd = conn.CreateCommand())
+                        using (var cmd = conn.CreateCommand())
                         {
                             cmd.CommandText = "INSERT IGNORE INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                                 replayID + "," +
@@ -163,13 +163,13 @@ namespace HeroesProfile_Backend
                                                 "\"" + replayURL + "\"" + "," +
                                                 "\"" + hotsapi_data.Processed + "\"" + "," +
                                                 "\"" + "Error parsing replay: ParserException" + "\"" + ")";
-                            MySqlDataReader Reader = cmd.ExecuteReader();
+                            var Reader = cmd.ExecuteReader();
                         }
                     }
                 }
                 else
                 {
-                    LambdaJson.ReplayData data = LambdaJson.ReplayData.FromJson(globalJson);
+                    var data = LambdaJson.ReplayData.FromJson(globalJson);
                     overallData = data;
                     //if (data.Mode != "Brawl")
                     //{
@@ -181,7 +181,7 @@ namespace HeroesProfile_Backend
 
 
 
-                        for (int h = 0; h < data.Players.Length; h++)
+                        for (var h = 0; h < data.Players.Length; h++)
                         {
                             if (heroes_translations.ContainsKey(data.Players[h].Hero.ToLower()))
                             {
@@ -219,11 +219,11 @@ namespace HeroesProfile_Backend
                         {
 
 
-                            LambdaJson.Player[] orderedPlayers = new LambdaJson.Player[10];
+                            var orderedPlayers = new LambdaJson.Player[10];
 
-                            int team1 = 0;
-                            int team2 = 5;
-                            for (int j = 0; j < data.Players.Length; j++)
+                            var team1 = 0;
+                            var team2 = 5;
+                            for (var j = 0; j < data.Players.Length; j++)
                             {
                                 if (data.Players[j].Team == 0)
                                 {
@@ -238,8 +238,8 @@ namespace HeroesProfile_Backend
                             }
                             data.Players = orderedPlayers;
 
-                            bool badMap = false;
-                            bool badGameType = false;
+                            var badMap = false;
+                            var badGameType = false;
                             if (maps.ContainsKey(data.Map))
                             {
                                 data.GameMap_id = maps[data.Map];
@@ -263,10 +263,10 @@ namespace HeroesProfile_Backend
                             if (!badMap && !badGameType)
                             {
 
-                                using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                                using (var conn = new MySqlConnection(db_connect_string))
                                 {
                                     conn.Open();
-                                    using (MySqlCommand cmd = conn.CreateCommand())
+                                    using (var cmd = conn.CreateCommand())
                                     {
                                         if (data.Mode != "Brawl")
                                         {
@@ -276,7 +276,7 @@ namespace HeroesProfile_Backend
                                         {
                                             cmd.CommandText = "SELECT replayID FROM heroesprofile_brawl.replay where replayID = " + replayID;
                                         }
-                                        MySqlDataReader Reader = cmd.ExecuteReader();
+                                        var Reader = cmd.ExecuteReader();
 
                                         if (Reader.HasRows)
                                         {
@@ -287,10 +287,10 @@ namespace HeroesProfile_Backend
                             }
                             else
                             {
-                                using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                                using (var conn = new MySqlConnection(db_connect_string))
                                 {
                                     conn.Open();
-                                    using (MySqlCommand cmd = conn.CreateCommand())
+                                    using (var cmd = conn.CreateCommand())
                                     {
                                         cmd.CommandText = "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                                             replayID + "," +
@@ -324,7 +324,7 @@ namespace HeroesProfile_Backend
                                                             "failure_status = VALUES(failure_status)";
                                         cmd.CommandTimeout = 0;
                                         //Console.WriteLine(cmd.CommandText);
-                                        MySqlDataReader Reader = cmd.ExecuteReader();
+                                        var Reader = cmd.ExecuteReader();
                                     }
                                 }
 
@@ -333,10 +333,10 @@ namespace HeroesProfile_Backend
                         }
                         else
                         {
-                            using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                            using (var conn = new MySqlConnection(db_connect_string))
                             {
                                 conn.Open();
-                                using (MySqlCommand cmd = conn.CreateCommand())
+                                using (var cmd = conn.CreateCommand())
                                 {
                                     cmd.CommandText = "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                                         replayID + "," +
@@ -370,17 +370,17 @@ namespace HeroesProfile_Backend
                                                         "failure_status = VALUES(failure_status)";
                                     cmd.CommandTimeout = 0;
                                     //Console.WriteLine(cmd.CommandText);
-                                    MySqlDataReader Reader = cmd.ExecuteReader();
+                                    var Reader = cmd.ExecuteReader();
                                 }
                             }
                         }
                     }
                     else
                     {
-                        using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                        using (var conn = new MySqlConnection(db_connect_string))
                         {
                             conn.Open();
-                            using (MySqlCommand cmd = conn.CreateCommand())
+                            using (var cmd = conn.CreateCommand())
                             {
                                 cmd.CommandText = "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                                     replayID + "," +
@@ -414,7 +414,7 @@ namespace HeroesProfile_Backend
                                                     "failure_status = VALUES(failure_status)";
                                 cmd.CommandTimeout = 0;
                                 //Console.WriteLine(cmd.CommandText);
-                                MySqlDataReader Reader = cmd.ExecuteReader();
+                                var Reader = cmd.ExecuteReader();
                             }
                         }
                     }
@@ -426,10 +426,10 @@ namespace HeroesProfile_Backend
             }
             catch (Exception e)
             {
-                using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                using (var conn = new MySqlConnection(db_connect_string))
                 {
                     conn.Open();
-                    using (MySqlCommand cmd = conn.CreateCommand())
+                    using (var cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "INSERT IGNORE INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                             replayID + "," +
@@ -446,7 +446,7 @@ namespace HeroesProfile_Backend
                                             "\"" + replayURL + "\"" + "," +
                                             "\"" + "NULL" + "\"" + "," +
                                             "\"" + e.ToString() + "\"" + ")";
-                        MySqlDataReader Reader = cmd.ExecuteReader();
+                        var Reader = cmd.ExecuteReader();
                     }
                 }
             }
@@ -467,12 +467,12 @@ namespace HeroesProfile_Backend
             this.maps_short = maps_short;
             this.heroes = heroes;
             this.mmr_ids = mmrs;
-            this.role = roles;
+            role = roles;
             this.heroes_attr = heroes_attr;
 
             try
             {
-                string globalJson = "";
+                var globalJson = "";
                 var httpWebRequest = (HttpWebRequest)WebRequest.Create("https://a73l75cbzg.execute-api.eu-west-1.amazonaws.com/default/parse-hots");
 
                 httpWebRequest.Method = "POST";
@@ -480,7 +480,7 @@ namespace HeroesProfile_Backend
 
                 using (var streamWriter = new StreamWriter(httpWebRequest.GetRequestStream()))
                 {
-                    string json = new JavaScriptSerializer().Serialize(new
+                    var json = new JavaScriptSerializer().Serialize(new
                     {
                         //input = "http://hotsapi.s3-website-eu-west-1.amazonaws.com/c5a49c21-d3d0-c8d9-c904-b3d09feea5e9.StormReplay",
                         input = replayURL,
@@ -503,10 +503,10 @@ namespace HeroesProfile_Backend
 
                 if (Regex.Match(result, "Error parsing replay: UnexpectedResult").Success)
                 {
-                    using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                    using (var conn = new MySqlConnection(db_connect_string))
                     {
                         conn.Open();
-                        using (MySqlCommand cmd = conn.CreateCommand())
+                        using (var cmd = conn.CreateCommand())
                         {
                             cmd.CommandText = "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                            replayID + "," +
@@ -524,17 +524,17 @@ namespace HeroesProfile_Backend
                                                 "\"" + "NULL" + "\"" + "," +
                                                 "\"" + "Error parsing replay: UnexpectedResult" + "\"" + ")";
                             cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1";
-                            MySqlDataReader Reader = cmd.ExecuteReader();
+                            var Reader = cmd.ExecuteReader();
                         }
                     }
                 }
 
                 else if (Regex.Match(result, "Error parsing replay: SuccessReplayDetail").Success)
                 {
-                    using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                    using (var conn = new MySqlConnection(db_connect_string))
                     {
                         conn.Open();
-                        using (MySqlCommand cmd = conn.CreateCommand())
+                        using (var cmd = conn.CreateCommand())
                         {
                             cmd.CommandText = "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                            replayID + "," +
@@ -552,16 +552,16 @@ namespace HeroesProfile_Backend
                                                 "\"" + "NULL" + "\"" + "," +
                                                 "\"" + "Error parsing replay: SuccessReplayDetail" + "\"" + ")";
                             cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1";
-                            MySqlDataReader Reader = cmd.ExecuteReader();
+                            var Reader = cmd.ExecuteReader();
                         }
                     }
                 }
                 else if (Regex.Match(result, "Error parsing replay: ParserException").Success)
                 {
-                    using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                    using (var conn = new MySqlConnection(db_connect_string))
                     {
                         conn.Open();
-                        using (MySqlCommand cmd = conn.CreateCommand())
+                        using (var cmd = conn.CreateCommand())
                         {
                             cmd.CommandText = "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                            replayID + "," +
@@ -579,14 +579,14 @@ namespace HeroesProfile_Backend
                                                 "\"" + "NULL" + "\"" + "," +
                                                 "\"" + "Error parsing replay: ParserException" + "\"" + ")";
                             cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1";
-                            MySqlDataReader Reader = cmd.ExecuteReader();
+                            var Reader = cmd.ExecuteReader();
                         }
                     }
                 }
 
                 else
                 {
-                    LambdaJson.ReplayData data = LambdaJson.ReplayData.FromJson(globalJson);
+                    var data = LambdaJson.ReplayData.FromJson(globalJson);
                     overallData = data;
                     //if (data.Mode != "Brawl")
                     // {
@@ -598,7 +598,7 @@ namespace HeroesProfile_Backend
 
 
 
-                        for (int h = 0; h < data.Players.Length; h++)
+                        for (var h = 0; h < data.Players.Length; h++)
                         {
                             if (heroes_translations.ContainsKey(data.Players[h].Hero.ToLower()))
                             {
@@ -637,11 +637,11 @@ namespace HeroesProfile_Backend
                         {
 
 
-                            LambdaJson.Player[] orderedPlayers = new LambdaJson.Player[10];
+                            var orderedPlayers = new LambdaJson.Player[10];
 
-                            int team1 = 0;
-                            int team2 = 5;
-                            for (int j = 0; j < data.Players.Length; j++)
+                            var team1 = 0;
+                            var team2 = 5;
+                            for (var j = 0; j < data.Players.Length; j++)
                             {
                                 if (data.Players[j].Team == 0)
                                 {
@@ -656,8 +656,8 @@ namespace HeroesProfile_Backend
                             }
                             data.Players = orderedPlayers;
 
-                            bool badMap = false;
-                            bool badGameType = false;
+                            var badMap = false;
+                            var badGameType = false;
                             if (maps.ContainsKey(data.Map))
                             {
                                 data.GameMap_id = maps[data.Map];
@@ -680,10 +680,10 @@ namespace HeroesProfile_Backend
 
                             if (!badMap && !badGameType)
                             {
-                                using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                                using (var conn = new MySqlConnection(db_connect_string))
                                 {
                                     conn.Open();
-                                    using (MySqlCommand cmd = conn.CreateCommand())
+                                    using (var cmd = conn.CreateCommand())
                                     {
                                         if (data.Mode != "Brawl")
                                         {
@@ -693,7 +693,7 @@ namespace HeroesProfile_Backend
                                         {
                                             cmd.CommandText = "SELECT replayID FROM heroesprofile_brawl.replay where replayID = " + replayID;
                                         }
-                                        MySqlDataReader Reader = cmd.ExecuteReader();
+                                        var Reader = cmd.ExecuteReader();
 
                                         if (Reader.HasRows)
                                         {
@@ -705,10 +705,10 @@ namespace HeroesProfile_Backend
                             }
                             else
                             {
-                                using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                                using (var conn = new MySqlConnection(db_connect_string))
                                 {
                                     conn.Open();
-                                    using (MySqlCommand cmd = conn.CreateCommand())
+                                    using (var cmd = conn.CreateCommand())
                                     {
                                         cmd.CommandText = "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                                             replayID + "," +
@@ -726,7 +726,7 @@ namespace HeroesProfile_Backend
                                                             "\"" + "NULL" + "\"" + "," +
                                                             "\"" + "Map or Game Type Bad" + "\"" + ")";
                                         cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1";
-                                        MySqlDataReader Reader = cmd.ExecuteReader();
+                                        var Reader = cmd.ExecuteReader();
                                     }
                                 }
 
@@ -735,10 +735,10 @@ namespace HeroesProfile_Backend
                         }
                         else
                         {
-                            using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                            using (var conn = new MySqlConnection(db_connect_string))
                             {
                                 conn.Open();
-                                using (MySqlCommand cmd = conn.CreateCommand())
+                                using (var cmd = conn.CreateCommand())
                                 {
                                     cmd.CommandText = "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                                         replayID + "," +
@@ -756,17 +756,17 @@ namespace HeroesProfile_Backend
                                                         "\"" + "NULL" + "\"" + "," +
                                                         "\"" + "Map or Game Type Bad" + "\"" + ")";
                                     cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1";
-                                    MySqlDataReader Reader = cmd.ExecuteReader();
+                                    var Reader = cmd.ExecuteReader();
                                 }
                             }
                         }
                     }
                     else
                     {
-                        using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                        using (var conn = new MySqlConnection(db_connect_string))
                         {
                             conn.Open();
-                            using (MySqlCommand cmd = conn.CreateCommand())
+                            using (var cmd = conn.CreateCommand())
                             {
                                 cmd.CommandText = "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                                     replayID + "," +
@@ -784,7 +784,7 @@ namespace HeroesProfile_Backend
                                                     "\"" + "NULL" + "\"" + "," +
                                                     "\"" + "Game Version Null" + "\"" + ")";
                                 cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1";
-                                MySqlDataReader Reader = cmd.ExecuteReader();
+                                var Reader = cmd.ExecuteReader();
                             }
                         }
                     }
@@ -796,23 +796,23 @@ namespace HeroesProfile_Backend
 
                 if (dupe)
                 {
-                    using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                    using (var conn = new MySqlConnection(db_connect_string))
                     {
                         conn.Open();
-                        using (MySqlCommand cmd = conn.CreateCommand())
+                        using (var cmd = conn.CreateCommand())
                         {
                             cmd.CommandText = "DELETE FROM replays_not_processed WHERE replayID = " + replayID;
-                            MySqlDataReader Reader = cmd.ExecuteReader();
+                            var Reader = cmd.ExecuteReader();
                         }
                     }
                 }
             }
             catch (Exception e)
             {
-                using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                using (var conn = new MySqlConnection(db_connect_string))
                 {
                     conn.Open();
-                    using (MySqlCommand cmd = conn.CreateCommand())
+                    using (var cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                             replayID + "," +
@@ -830,7 +830,7 @@ namespace HeroesProfile_Backend
                                             "\"" + "NULL" + "\"" + "," +
                                             "\"" + e.ToString() + "\"" + ")";
                         cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1";
-                        MySqlDataReader Reader = cmd.ExecuteReader();
+                        var Reader = cmd.ExecuteReader();
                     }
                 }
             }
@@ -843,20 +843,20 @@ namespace HeroesProfile_Backend
             {
                 if (data.Players != null)
                 {
-                    using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                    using (var conn = new MySqlConnection(db_connect_string))
                     {
                         conn.Open();
-                        bool badHeroName = false;
-                        bool badTalentName = false;
+                        var badHeroName = false;
+                        var badTalentName = false;
                         if (data.Players.Length == 10)
                         {
-                            for (int i = 0; i < data.Players.Length; i++)
+                            for (var i = 0; i < data.Players.Length; i++)
                             {
                                 if (data.Players[i].Hero == null)
                                 {
                                     if (data.Players[i].Talents != null)
                                     {
-                                        string[] split = Regex.Split(data.Players[i].Talents[0], @"(?<!^)(?=[A-Z])");
+                                        var split = Regex.Split(data.Players[i].Talents[0], @"(?<!^)(?=[A-Z])");
 
                                         if (heroes.ContainsKey(split[0]))
                                         {
@@ -896,7 +896,7 @@ namespace HeroesProfile_Backend
 
                                 if (data.Players[i].Talents != null)
                                 {
-                                    for (int t = 0; t < data.Players[i].Talents.Length; t++)
+                                    for (var t = 0; t < data.Players[i].Talents.Length; t++)
                                     {
                                         if (!talents.ContainsKey(data.Players[i].Hero + "|" + data.Players[i].Talents[t]))
                                         {
@@ -906,12 +906,12 @@ namespace HeroesProfile_Backend
 
                                 }
                             }
-                            DateTimeOffset team_one_level_ten_time = DateTimeOffset.Now;
-                            DateTimeOffset team_two_level_ten_time = DateTimeOffset.Now;
+                            var team_one_level_ten_time = DateTimeOffset.Now;
+                            var team_two_level_ten_time = DateTimeOffset.Now;
 
-                            for (int teams = 0; teams < data.TeamExperience.Length; teams++)
+                            for (var teams = 0; teams < data.TeamExperience.Length; teams++)
                             {
-                                for (int team_time_split = 0; team_time_split < data.TeamExperience[teams].Length; team_time_split++)
+                                for (var team_time_split = 0; team_time_split < data.TeamExperience[teams].Length; team_time_split++)
                                 {
                                     if (data.TeamExperience[teams][team_time_split].TeamLevel >= 10)
                                     {
@@ -930,8 +930,8 @@ namespace HeroesProfile_Backend
                                     }
                                 }
                             }
-                            int team_one_first_to_ten = 0;
-                            int team_two_first_to_ten = 0;
+                            var team_one_first_to_ten = 0;
+                            var team_two_first_to_ten = 0;
                             if (team_one_level_ten_time < team_two_level_ten_time)
                             {
                                 team_one_first_to_ten = 1;
@@ -941,7 +941,7 @@ namespace HeroesProfile_Backend
                                 team_two_first_to_ten = 1;
                             }
 
-                            for (int i = 0; i < data.Players.Length; i++)
+                            for (var i = 0; i < data.Players.Length; i++)
                             {
                                 if (data.Players[i].Team == 0)
                                 {
@@ -958,12 +958,12 @@ namespace HeroesProfile_Backend
                             if (!badHeroName)
                             {
 
-                                for (int i = 0; i < data.Players.Length; i++)
+                                for (var i = 0; i < data.Players.Length; i++)
                                 {
 
                                     //Console.WriteLine("Adding Battletag to battletag table for: " + data.Players.Battletag);
 
-                                    using (MySqlCommand cmd = conn.CreateCommand())
+                                    using (var cmd = conn.CreateCommand())
                                     {
                                         cmd.CommandText = "INSERT INTO battletags (blizz_id, battletag, region, account_level, latest_game) VALUES " +
                                             "(" + data.Players[i].BlizzId + "," +
@@ -982,17 +982,17 @@ namespace HeroesProfile_Backend
 
 
 
-                                        MySqlDataReader Reader = cmd.ExecuteReader();
+                                        var Reader = cmd.ExecuteReader();
                                     }
                                     //Console.WriteLine("Getting player_id for: " + data.Players.Battletag);
 
 
-                                    using (MySqlCommand cmd = conn.CreateCommand())
+                                    using (var cmd = conn.CreateCommand())
                                     {
 
                                         cmd.CommandText = "SELECT player_id from battletags where battletag = " + "\"" + data.Players[i].BattletagName + "#" + data.Players[i].BattletagId + "\"";
                                         cmd.CommandTimeout = 0;
-                                        MySqlDataReader Reader = cmd.ExecuteReader();
+                                        var Reader = cmd.ExecuteReader();
 
                                         while (Reader.Read())
                                         {
@@ -1005,7 +1005,7 @@ namespace HeroesProfile_Backend
 
                                 //Console.WriteLine("Saving Replay Information for:" + data.Id);
 
-                                using (MySqlCommand cmd = conn.CreateCommand())
+                                using (var cmd = conn.CreateCommand())
                                 {
                                     cmd.CommandText = "INSERT INTO replay (replayID, parsed_id, game_type, game_date, game_length, game_map, game_version, region, date_added) VALUES(" +
                                         replayID + "," +
@@ -1019,20 +1019,20 @@ namespace HeroesProfile_Backend
                                         "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + ")";
                                     cmd.CommandTimeout = 0;
                                     //Console.WriteLine(cmd.CommandText);
-                                    MySqlDataReader Reader = cmd.ExecuteReader();
+                                    var Reader = cmd.ExecuteReader();
                                 }
 
 
-                                using (MySqlCommand cmd = conn.CreateCommand())
+                                using (var cmd = conn.CreateCommand())
                                 {
                                     cmd.CommandText = "DELETE FROM replays_not_processed WHERE replayID = " + replayID;
-                                    MySqlDataReader Reader = cmd.ExecuteReader();
+                                    var Reader = cmd.ExecuteReader();
                                 }
 
 
                                 if (game_types[data.Mode] == "5")
                                 {
-                                    using (MySqlCommand cmd = conn.CreateCommand())
+                                    using (var cmd = conn.CreateCommand())
                                     {
                                         cmd.CommandText = "INSERT IGNORE INTO replays_ran_mmr (replayID, game_date) VALUES(" +
                                             replayID + "," +
@@ -1040,14 +1040,14 @@ namespace HeroesProfile_Backend
                                             "\"" + data.Date.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + ")";
                                         cmd.CommandTimeout = 0;
                                         // Console.WriteLine(cmd.CommandText);
-                                        MySqlDataReader Reader = cmd.ExecuteReader();
+                                        var Reader = cmd.ExecuteReader();
                                     }
                                 }
 
 
-                                for (int i = 0; i < data.Bans.Length; i++)
+                                for (var i = 0; i < data.Bans.Length; i++)
                                 {
-                                    for (int j = 0; j < data.Bans[i].Length; j++)
+                                    for (var j = 0; j < data.Bans[i].Length; j++)
                                     {
                                         if (data.Bans[i][j] != null)
                                         {
@@ -1062,13 +1062,13 @@ namespace HeroesProfile_Backend
                                 }
                                 if (data.Bans != null)
                                 {
-                                    for (int i = 0; i < data.Bans.Length; i++)
+                                    for (var i = 0; i < data.Bans.Length; i++)
                                     {
-                                        for (int j = 0; j < data.Bans[i].Length; j++)
+                                        for (var j = 0; j < data.Bans[i].Length; j++)
                                         {
-                                            using (MySqlCommand cmd = conn.CreateCommand())
+                                            using (var cmd = conn.CreateCommand())
                                             {
-                                                string value = "0";
+                                                var value = "0";
 
                                                 if (data.Bans[i][j] != null)
                                                 {
@@ -1080,18 +1080,18 @@ namespace HeroesProfile_Backend
                                                     value + ")";
                                                 cmd.CommandTimeout = 0;
                                                 //Console.WriteLine(cmd.CommandText);
-                                                MySqlDataReader Reader = cmd.ExecuteReader();
+                                                var Reader = cmd.ExecuteReader();
                                             }
                                         }
                                     }
                                 }
 
 
-                                for (int i = 0; i < data.TeamExperience.Length; i++)
+                                for (var i = 0; i < data.TeamExperience.Length; i++)
                                 {
-                                    for (int j = 0; j < data.TeamExperience[i].Length; j++)
+                                    for (var j = 0; j < data.TeamExperience[i].Length; j++)
                                     {
-                                        using (MySqlCommand cmd = conn.CreateCommand())
+                                        using (var cmd = conn.CreateCommand())
                                         {
                                             cmd.CommandText = "INSERT into replay_experience_breakdown (replayID, team, team_level, timestamp, structureXP, creepXP, heroXP, minionXP, trickXP, totalXP) VALUES(" +
                                             "\"" + replayID + "\"" + "," +
@@ -1117,7 +1117,7 @@ namespace HeroesProfile_Backend
                                                     "totalXP = VALUES(totalXP)";
 
                                             //Console.WriteLine(cmd.CommandText);
-                                            MySqlDataReader writeReader = cmd.ExecuteReader();
+                                            var writeReader = cmd.ExecuteReader();
 
                                         }
                                     }
@@ -1127,7 +1127,7 @@ namespace HeroesProfile_Backend
                                 //data = calculateMMR(data, conn);
 
 
-                                for (int i = 0; i < data.Players.Length; i++)
+                                for (var i = 0; i < data.Players.Length; i++)
                                 {
                                     foreach (var item in data.Players[i].HeroLevelTaunt)
                                     {
@@ -1142,7 +1142,7 @@ namespace HeroesProfile_Backend
                                     }
 
 
-                                    for (int j = 0; j < data.Players.Length; j++)
+                                    for (var j = 0; j < data.Players.Length; j++)
                                     {
                                         if (j != i)
                                         {
@@ -1156,7 +1156,7 @@ namespace HeroesProfile_Backend
                                 }
 
 
-                                for (int i = 0; i < data.Players.Length; i++)
+                                for (var i = 0; i < data.Players.Length; i++)
                                 {
                                     if (data.Players[i].Winner)
                                     {
@@ -1168,7 +1168,7 @@ namespace HeroesProfile_Backend
 
                                     }
                                     //Console.WriteLine("Saving Player Information for:" + data.Players.Battletag);
-                                    using (MySqlCommand cmd = conn.CreateCommand())
+                                    using (var cmd = conn.CreateCommand())
                                     {
                                         cmd.CommandText = "INSERT INTO player (" +
                                             "replayID, " +
@@ -1194,13 +1194,13 @@ namespace HeroesProfile_Backend
                                             data.Players[i].Party +
                                             ")";
                                         cmd.CommandTimeout = 0;
-                                        MySqlDataReader Reader = cmd.ExecuteReader();
+                                        var Reader = cmd.ExecuteReader();
                                     }
 
                                     //Console.WriteLine("Saving Score Information for:" + data.Players.Battletag);
                                     if (data.Players[i].Score != null)
                                     {
-                                        using (MySqlCommand cmd = conn.CreateCommand())
+                                        using (var cmd = conn.CreateCommand())
                                         {
                                             cmd.CommandText = "INSERT INTO scores (" +
                                                 "replayID, " +
@@ -1305,12 +1305,12 @@ namespace HeroesProfile_Backend
 
                                             cmd.CommandTimeout = 0;
                                             //Console.WriteLine(cmd.CommandText);
-                                            MySqlDataReader Reader = cmd.ExecuteReader();
+                                            var Reader = cmd.ExecuteReader();
                                         }
                                     }
 
                                     //Console.WriteLine("Saving Talent Information for:" + data.Players.Battletag);
-                                    using (MySqlCommand cmd = conn.CreateCommand())
+                                    using (var cmd = conn.CreateCommand())
                                     {
                                         if (data.Players[i].Talents != null)
                                         {
@@ -1400,7 +1400,7 @@ namespace HeroesProfile_Backend
 
                                             cmd.CommandTimeout = 0;
                                             //Console.WriteLine(cmd.CommandText);
-                                            MySqlDataReader Reader = cmd.ExecuteReader();
+                                            var Reader = cmd.ExecuteReader();
                                         }
                                         else
                                         {
@@ -1417,7 +1417,7 @@ namespace HeroesProfile_Backend
 
                                             cmd.CommandTimeout = 0;
                                             //Console.WriteLine(cmd.CommandText);
-                                            MySqlDataReader Reader = cmd.ExecuteReader();
+                                            var Reader = cmd.ExecuteReader();
                                         }
 
                                     }
@@ -1435,7 +1435,7 @@ namespace HeroesProfile_Backend
                                 }
                                 else
                                 {
-                                    string season = saveToSeasonGameVersion(DateTime.Parse(data.Date.ToString("yyyy-MM-dd HH:mm:ss")), data.VersionSplit, conn);
+                                    var season = saveToSeasonGameVersion(DateTime.Parse(data.Date.ToString("yyyy-MM-dd HH:mm:ss")), data.VersionSplit, conn);
                                     seasons_game_versions.Add(data.VersionSplit, season);
                                     //Save Game Version to table
                                     //Add it to dic
@@ -1483,10 +1483,10 @@ namespace HeroesProfile_Backend
             }
             catch (Exception e)
             {
-                using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                using (var conn = new MySqlConnection(db_connect_string))
                 {
                     conn.Open();
-                    using (MySqlCommand cmd = conn.CreateCommand())
+                    using (var cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                             replayID + "," +
@@ -1520,7 +1520,7 @@ namespace HeroesProfile_Backend
                                             "failure_status = VALUES(failure_status)";
                         cmd.CommandTimeout = 0;
                         //Console.WriteLine(cmd.CommandText);
-                        MySqlDataReader Reader = cmd.ExecuteReader();
+                        var Reader = cmd.ExecuteReader();
                     }
                 }
             }
@@ -1534,20 +1534,20 @@ namespace HeroesProfile_Backend
                 data.GameType_id = "-1";
                 if (data.Players != null)
                 {
-                    using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                    using (var conn = new MySqlConnection(db_connect_string))
                     {
                         conn.Open();
-                        bool badHeroName = false;
-                        bool badTalentName = false;
+                        var badHeroName = false;
+                        var badTalentName = false;
                         if (data.Players.Length == 10)
                         {
-                            for (int i = 0; i < data.Players.Length; i++)
+                            for (var i = 0; i < data.Players.Length; i++)
                             {
                                 if (data.Players[i].Hero == null)
                                 {
                                     if (data.Players[i].Talents != null)
                                     {
-                                        string[] split = Regex.Split(data.Players[i].Talents[0], @"(?<!^)(?=[A-Z])");
+                                        var split = Regex.Split(data.Players[i].Talents[0], @"(?<!^)(?=[A-Z])");
 
                                         if (heroes.ContainsKey(split[0]))
                                         {
@@ -1587,7 +1587,7 @@ namespace HeroesProfile_Backend
 
                                 if (data.Players[i].Talents != null)
                                 {
-                                    for (int t = 0; t < data.Players[i].Talents.Length; t++)
+                                    for (var t = 0; t < data.Players[i].Talents.Length; t++)
                                     {
                                         if (!talents.ContainsKey(data.Players[i].Hero + "|" + data.Players[i].Talents[t]))
                                         {
@@ -1597,12 +1597,12 @@ namespace HeroesProfile_Backend
 
                                 }
                             }
-                            DateTimeOffset team_one_level_ten_time = DateTimeOffset.Now;
-                            DateTimeOffset team_two_level_ten_time = DateTimeOffset.Now;
+                            var team_one_level_ten_time = DateTimeOffset.Now;
+                            var team_two_level_ten_time = DateTimeOffset.Now;
 
-                            for (int teams = 0; teams < data.TeamExperience.Length; teams++)
+                            for (var teams = 0; teams < data.TeamExperience.Length; teams++)
                             {
-                                for (int team_time_split = 0; team_time_split < data.TeamExperience[teams].Length; team_time_split++)
+                                for (var team_time_split = 0; team_time_split < data.TeamExperience[teams].Length; team_time_split++)
                                 {
                                     if (data.TeamExperience[teams][team_time_split].TeamLevel >= 10)
                                     {
@@ -1621,8 +1621,8 @@ namespace HeroesProfile_Backend
                                     }
                                 }
                             }
-                            int team_one_first_to_ten = 0;
-                            int team_two_first_to_ten = 0;
+                            var team_one_first_to_ten = 0;
+                            var team_two_first_to_ten = 0;
                             if (team_one_level_ten_time < team_two_level_ten_time)
                             {
                                 team_one_first_to_ten = 1;
@@ -1632,7 +1632,7 @@ namespace HeroesProfile_Backend
                                 team_two_first_to_ten = 1;
                             }
 
-                            for (int i = 0; i < data.Players.Length; i++)
+                            for (var i = 0; i < data.Players.Length; i++)
                             {
                                 if (data.Players[i].Team == 0)
                                 {
@@ -1649,12 +1649,12 @@ namespace HeroesProfile_Backend
                             if (!badHeroName)
                             {
 
-                                for (int i = 0; i < data.Players.Length; i++)
+                                for (var i = 0; i < data.Players.Length; i++)
                                 {
 
                                     //Console.WriteLine("Adding Battletag to battletag table for: " + data.Players.Battletag);
 
-                                    using (MySqlCommand cmd = conn.CreateCommand())
+                                    using (var cmd = conn.CreateCommand())
                                     {
                                         cmd.CommandText = "INSERT INTO battletags (blizz_id, battletag, region, account_level, latest_game) VALUES " +
                                             "(" + data.Players[i].BlizzId + "," +
@@ -1673,17 +1673,17 @@ namespace HeroesProfile_Backend
 
 
 
-                                        MySqlDataReader Reader = cmd.ExecuteReader();
+                                        var Reader = cmd.ExecuteReader();
                                     }
                                     //Console.WriteLine("Getting player_id for: " + data.Players.Battletag);
 
 
-                                    using (MySqlCommand cmd = conn.CreateCommand())
+                                    using (var cmd = conn.CreateCommand())
                                     {
 
                                         cmd.CommandText = "SELECT player_id from battletags where battletag = " + "\"" + data.Players[i].BattletagName + "#" + data.Players[i].BattletagId + "\"";
                                         cmd.CommandTimeout = 0;
-                                        MySqlDataReader Reader = cmd.ExecuteReader();
+                                        var Reader = cmd.ExecuteReader();
 
                                         while (Reader.Read())
                                         {
@@ -1696,7 +1696,7 @@ namespace HeroesProfile_Backend
 
                                 //Console.WriteLine("Saving Replay Information for:" + data.Id);
 
-                                using (MySqlCommand cmd = conn.CreateCommand())
+                                using (var cmd = conn.CreateCommand())
                                 {
                                     cmd.CommandText = "INSERT INTO heroesprofile_brawl.replay (replayID, game_date, game_length, game_map, game_version, region, date_added) VALUES(" +
                                         replayID + "," +
@@ -1708,17 +1708,17 @@ namespace HeroesProfile_Backend
                                         "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + ")";
                                     cmd.CommandTimeout = 0;
                                     //Console.WriteLine(cmd.CommandText);
-                                    MySqlDataReader Reader = cmd.ExecuteReader();
+                                    var Reader = cmd.ExecuteReader();
                                 }
 
 
-                                using (MySqlCommand cmd = conn.CreateCommand())
+                                using (var cmd = conn.CreateCommand())
                                 {
                                     cmd.CommandText = "DELETE FROM replays_not_processed WHERE replayID = " + replayID;
-                                    MySqlDataReader Reader = cmd.ExecuteReader();
+                                    var Reader = cmd.ExecuteReader();
                                 }
 
-                                for (int i = 0; i < data.Players.Length; i++)
+                                for (var i = 0; i < data.Players.Length; i++)
                                 {
                                     foreach (var item in data.Players[i].HeroLevelTaunt)
                                     {
@@ -1731,7 +1731,7 @@ namespace HeroesProfile_Backend
                                             }
                                         }
                                     }
-                                    for (int j = 0; j < data.Players.Length; j++)
+                                    for (var j = 0; j < data.Players.Length; j++)
                                     {
                                         if (j != i)
                                         {
@@ -1743,7 +1743,7 @@ namespace HeroesProfile_Backend
                                     }
                                 }
 
-                                for (int i = 0; i < data.Players.Length; i++)
+                                for (var i = 0; i < data.Players.Length; i++)
                                 {
                                     if (data.Players[i].Winner)
                                     {
@@ -1756,7 +1756,7 @@ namespace HeroesProfile_Backend
                                     }
 
 
-                                    using (MySqlCommand cmd = conn.CreateCommand())
+                                    using (var cmd = conn.CreateCommand())
                                     {
                                         cmd.CommandText = "INSERT INTO heroesprofile_brawl.player (" +
                                             "replayID, " +
@@ -1779,12 +1779,12 @@ namespace HeroesProfile_Backend
                                             data.Players[i].WinnerValue + "," +
                                             data.Players[i].Party + ")";
                                         cmd.CommandTimeout = 0;
-                                        MySqlDataReader Reader = cmd.ExecuteReader();
+                                        var Reader = cmd.ExecuteReader();
                                     }
 
                                     if (data.Players[i].Score != null)
                                     {
-                                        using (MySqlCommand cmd = conn.CreateCommand())
+                                        using (var cmd = conn.CreateCommand())
                                         {
                                             cmd.CommandText = "INSERT INTO heroesprofile_brawl.scores (" +
                                                 "replayID, " +
@@ -1889,12 +1889,12 @@ namespace HeroesProfile_Backend
 
                                             cmd.CommandTimeout = 0;
                                             //Console.WriteLine(cmd.CommandText);
-                                            MySqlDataReader Reader = cmd.ExecuteReader();
+                                            var Reader = cmd.ExecuteReader();
                                         }
                                     }
 
                                     //Console.WriteLine("Saving Talent Information for:" + data.Players.Battletag);
-                                    using (MySqlCommand cmd = conn.CreateCommand())
+                                    using (var cmd = conn.CreateCommand())
                                     {
                                         if (data.Players[i].Talents != null)
                                         {
@@ -1984,7 +1984,7 @@ namespace HeroesProfile_Backend
 
                                             cmd.CommandTimeout = 0;
                                             //Console.WriteLine(cmd.CommandText);
-                                            MySqlDataReader Reader = cmd.ExecuteReader();
+                                            var Reader = cmd.ExecuteReader();
                                         }
                                         else
                                         {
@@ -2001,7 +2001,7 @@ namespace HeroesProfile_Backend
 
                                             cmd.CommandTimeout = 0;
                                             //Console.WriteLine(cmd.CommandText);
-                                            MySqlDataReader Reader = cmd.ExecuteReader();
+                                            var Reader = cmd.ExecuteReader();
                                         }
 
                                     }
@@ -2019,7 +2019,7 @@ namespace HeroesProfile_Backend
                                 }
                                 else
                                 {
-                                    string season = saveToSeasonGameVersion(DateTime.Parse(data.Date.ToString("yyyy-MM-dd HH:mm:ss")), data.VersionSplit, conn);
+                                    var season = saveToSeasonGameVersion(DateTime.Parse(data.Date.ToString("yyyy-MM-dd HH:mm:ss")), data.VersionSplit, conn);
                                     seasons_game_versions.Add(data.VersionSplit, season);
                                     //Save Game Version to table
                                     //Add it to dic
@@ -2068,10 +2068,10 @@ namespace HeroesProfile_Backend
             }
             catch (Exception e)
             {
-                using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+                using (var conn = new MySqlConnection(db_connect_string))
                 {
                     conn.Open();
-                    using (MySqlCommand cmd = conn.CreateCommand())
+                    using (var cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
                                             replayID + "," +
@@ -2105,7 +2105,7 @@ namespace HeroesProfile_Backend
                                             "failure_status = VALUES(failure_status)";
                         cmd.CommandTimeout = 0;
                         //Console.WriteLine(cmd.CommandText);
-                        MySqlDataReader Reader = cmd.ExecuteReader();
+                        var Reader = cmd.ExecuteReader();
                     }
                 }
             }
@@ -2129,10 +2129,10 @@ namespace HeroesProfile_Backend
         {
             //
 
-            for (int i = 0; i < data.Players.Length; i++)
+            for (var i = 0; i < data.Players.Length; i++)
             {
 
-                int win_loss = 0;
+                var win_loss = 0;
                 if (data.Players[i].Winner)
                 {
 
@@ -2149,7 +2149,7 @@ namespace HeroesProfile_Backend
 
                 if (data.Players[i].Score != null)
                 {
-                    int hero_level = 0;
+                    var hero_level = 0;
 
                     if (data.Players[i].HeroLevel < 5)
                     {
@@ -2174,7 +2174,7 @@ namespace HeroesProfile_Backend
                         hero_level = 20;
                     }
 
-                    using (MySqlCommand cmd = conn.CreateCommand())
+                    using (var cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = "INSERT INTO global_hero_stats (" +
                        "game_version, " +
@@ -2326,7 +2326,7 @@ namespace HeroesProfile_Backend
                             "regen_globes = regen_globes + VALUES(regen_globes), " +
                             "games_played = games_played + VALUES(games_played)";
                         //Console.WriteLine(cmd.CommandText);
-                        MySqlDataReader Reader = cmd.ExecuteReader();
+                        var Reader = cmd.ExecuteReader();
                     }
                 }
             }
@@ -2334,10 +2334,10 @@ namespace HeroesProfile_Backend
 
         private void updateMatchups(LambdaJson.ReplayData data, MySqlConnection conn)
         {
-            for (int i = 0; i < data.Players.Length; i++)
+            for (var i = 0; i < data.Players.Length; i++)
             {
 
-                int win_loss = 0;
+                var win_loss = 0;
                 if (data.Players[i].Winner)
                 {
 
@@ -2354,7 +2354,7 @@ namespace HeroesProfile_Backend
 
                 if (data.Players[i].Score != null)
                 {
-                    int hero_level = 0;
+                    var hero_level = 0;
 
                     if (data.Players[i].HeroLevel < 5)
                     {
@@ -2378,11 +2378,11 @@ namespace HeroesProfile_Backend
                         hero_level = 20;
                     }
 
-                    for (int j = 0; j < data.Players.Length; j++)
+                    for (var j = 0; j < data.Players.Length; j++)
                     {
                         if (data.Players[j].BlizzId != data.Players[i].BlizzId)
                         {
-                            using (MySqlCommand cmd = conn.CreateCommand())
+                            using (var cmd = conn.CreateCommand())
                             {
                                 if (data.Players[j].Team == data.Players[i].Team)
                                 {
@@ -2425,7 +2425,7 @@ namespace HeroesProfile_Backend
                                 cmd.CommandText += "win_loss = VALUES(win_loss), " +
                                     "games_played = games_played + VALUES(games_played)";
                                 //Console.WriteLine(cmd.CommandText);
-                                MySqlDataReader Reader = cmd.ExecuteReader();
+                                var Reader = cmd.ExecuteReader();
                             }
 
                         }
@@ -2437,12 +2437,12 @@ namespace HeroesProfile_Backend
         }
         private int insertTalentCombo(string hero, int level_one, int level_four, int level_seven, int level_ten, int level_thirteen, int level_sixteen, int level_twenty)
         {
-            int comb_id = 0;
+            var comb_id = 0;
 
-            using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+            using (var conn = new MySqlConnection(db_connect_string))
             {
                 conn.Open();
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "INSERT INTO talent_combination_id (hero, level_one, level_four, level_seven, level_ten, level_thirteen, level_sixteen, level_twenty) VALUES (" +
                         hero + "," +
@@ -2455,11 +2455,11 @@ namespace HeroesProfile_Backend
                         level_twenty +
                         ")";
 
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var Reader = cmd.ExecuteReader();
                 }
 
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT talent_combination_id FROM heroesprofile.talent_combinations WHERE " +
                         "hero = " + hero +
@@ -2471,7 +2471,7 @@ namespace HeroesProfile_Backend
                         " AND level_sixteen = " + level_sixteen +
                         " AND level_twenty = " + level_twenty;
 
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var Reader = cmd.ExecuteReader();
 
                     while (Reader.Read())
                     {
@@ -2485,11 +2485,11 @@ namespace HeroesProfile_Backend
 
         private int getHeroCombID(string hero, int level_one, int level_four, int level_seven, int level_ten, int level_thirteen, int level_sixteen, int level_twenty)
         {
-            int comb_id = 0;
-            using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+            var comb_id = 0;
+            using (var conn = new MySqlConnection(db_connect_string))
             {
                 conn.Open();
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "SELECT talent_combination_id FROM heroesprofile.talent_combinations WHERE " +
                         "hero = " + hero +
@@ -2501,7 +2501,7 @@ namespace HeroesProfile_Backend
                         " AND level_sixteen = " + level_sixteen +
                         " AND level_twenty = " + level_twenty;
 
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var Reader = cmd.ExecuteReader();
 
                     while (Reader.Read())
                     {
@@ -2518,9 +2518,9 @@ namespace HeroesProfile_Backend
         }
         private void updateGlobalTalentData(LambdaJson.ReplayData data, MySqlConnection conn)
         {
-            for (int i = 0; i < data.Players.Length; i++)
+            for (var i = 0; i < data.Players.Length; i++)
             {
-                int win_loss = 0;
+                var win_loss = 0;
                 if (data.Players[i].Winner)
                 {
 
@@ -2535,7 +2535,7 @@ namespace HeroesProfile_Backend
                 if (data.Players[i].Score != null)
                 {
 
-                    int hero_level = 0;
+                    var hero_level = 0;
 
                     if (data.Players[i].HeroLevel < 5)
                     {
@@ -2581,7 +2581,7 @@ namespace HeroesProfile_Backend
                         }
                     }
 
-                    using (MySqlCommand cmd = conn.CreateCommand())
+                    using (var cmd = conn.CreateCommand())
                     {
 
                         cmd.CommandText = "INSERT INTO global_hero_talents (" +
@@ -2826,7 +2826,7 @@ namespace HeroesProfile_Backend
                             "regen_globes = regen_globes + VALUES(regen_globes), " +
                             "games_played = games_played + VALUES(games_played)";
                         //Console.WriteLine(cmd.CommandText);
-                        MySqlDataReader Reader = cmd.ExecuteReader();
+                        var Reader = cmd.ExecuteReader();
                     }
                 }
 
@@ -2837,11 +2837,11 @@ namespace HeroesProfile_Backend
 
         private void updateGameModeTotalGames(int season, LambdaJson.ReplayData data, MySqlConnection conn)
         {
-            for (int i = 0; i < data.Players.Length; i++)
+            for (var i = 0; i < data.Players.Length; i++)
             {
 
-                int wins = 0;
-                int losses = 0;
+                var wins = 0;
+                var losses = 0;
                 if (data.Players[i].Winner)
                 {
 
@@ -2853,7 +2853,7 @@ namespace HeroesProfile_Backend
                     losses = 1;
                 }
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "INSERT INTO master_games_played_data (type_value, season, game_type, blizz_id, region, win, loss, games_played) VALUES (" +
                         "\"" + mmr_ids["player"] + "\"" + "," +
@@ -2874,11 +2874,11 @@ namespace HeroesProfile_Backend
                         "loss = loss + VALUES(loss), " +
                         "games_played = games_played + VALUES(games_played)";
                     //Console.WriteLine(cmd.CommandText);
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var Reader = cmd.ExecuteReader();
                 }
 
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "INSERT INTO master_games_played_data (type_value, season, game_type, blizz_id, region, win, loss, games_played) VALUES (" +
                         "\"" + mmr_ids[role[data.Players[i].Hero]] + "\"" + "," +
@@ -2899,10 +2899,10 @@ namespace HeroesProfile_Backend
                         "loss = loss + VALUES(loss), " +
                         "games_played = games_played + VALUES(games_played)";
                     //Console.WriteLine(cmd.CommandText);
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var Reader = cmd.ExecuteReader();
                 }
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "INSERT INTO master_games_played_data (type_value, season, game_type, blizz_id, region, win, loss, games_played) VALUES (" +
                         "\"" + mmr_ids[data.Players[i].Hero] + "\"" + "," +
@@ -2923,16 +2923,16 @@ namespace HeroesProfile_Backend
                         "loss = loss + VALUES(loss), " +
                         "games_played = games_played + VALUES(games_played)";
                     //Console.WriteLine(cmd.CommandText);
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var Reader = cmd.ExecuteReader();
                 }
             }
 
         }
         private void updateGlobalTalentDataDetails(LambdaJson.ReplayData data, MySqlConnection conn)
         {
-            for (int i = 0; i < data.Players.Length; i++)
+            for (var i = 0; i < data.Players.Length; i++)
             {
-                for (int j = 0; j < data.Players.Length; j++)
+                for (var j = 0; j < data.Players.Length; j++)
                 {
                     if (j != i)
                     {
@@ -2945,10 +2945,10 @@ namespace HeroesProfile_Backend
                 }
             }
 
-            for (int i = 0; i < data.Players.Length; i++)
+            for (var i = 0; i < data.Players.Length; i++)
             {
 
-                int win_loss = 0;
+                var win_loss = 0;
                 if (data.Players[i].Winner)
                 {
 
@@ -2962,9 +2962,9 @@ namespace HeroesProfile_Backend
 
                 if (data.Players[i].Talents != null)
                 {
-                    for (int t = 0; t < 7; t++)
+                    for (var t = 0; t < 7; t++)
                     {
-                        string level = "";
+                        var level = "";
                         if (t == 0)
                         {
                             level = "1";
@@ -3002,7 +3002,7 @@ namespace HeroesProfile_Backend
 
                         if (data.Players[i].Score != null)
                         {
-                            int hero_level = 0;
+                            var hero_level = 0;
 
                             if (data.Players[i].HeroLevel < 5)
                             {
@@ -3048,7 +3048,7 @@ namespace HeroesProfile_Backend
                                 }
                             }
 
-                            using (MySqlCommand cmd = conn.CreateCommand())
+                            using (var cmd = conn.CreateCommand())
                             {
 
                                 cmd.CommandText = "INSERT INTO global_hero_talents_details (" +
@@ -3224,7 +3224,7 @@ namespace HeroesProfile_Backend
                                     "regen_globes = regen_globes + VALUES(regen_globes), " +
                                     "games_played = games_played + VALUES(games_played)";
                                 //Console.WriteLine(cmd.CommandText);
-                                MySqlDataReader Reader = cmd.ExecuteReader();
+                                var Reader = cmd.ExecuteReader();
                             }
                         }
                     }
@@ -3238,7 +3238,7 @@ namespace HeroesProfile_Backend
         {
             if (hero == "")
             {
-                string[] split = Regex.Split(talent_name, @"(?<!^)(?=[A-Z])");
+                var split = Regex.Split(talent_name, @"(?<!^)(?=[A-Z])");
                 if (heroes_alt.ContainsKey(split[0]))
                 {
                     hero = heroes_alt[split[0]];
@@ -3250,8 +3250,8 @@ namespace HeroesProfile_Backend
                 }
 
             }
-            string id = "";
-            using (MySqlCommand cmd = conn.CreateCommand())
+            var id = "";
+            using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "INSERT IGNORE INTO heroes_data_talents (hero_name, short_name, attribute_id, title, talent_name, description, status, hotkey, cooldown, mana_cost, sort, level, icon) VALUES " +
                     "(" +
@@ -3274,16 +3274,16 @@ namespace HeroesProfile_Backend
 
 
 
-                MySqlDataReader Reader = cmd.ExecuteReader();
+                var Reader = cmd.ExecuteReader();
             }
 
 
-            using (MySqlCommand cmd = conn.CreateCommand())
+            using (var cmd = conn.CreateCommand())
             {
 
                 cmd.CommandText = "SELECT talent_id from heroes_data_talents where hero_name = " + "\"" + hero + "\"" + " AND talent_name = " + "\"" + talent_name + "\"" + "  order by talent_id asc";
                 cmd.CommandTimeout = 0;
-                MySqlDataReader Reader = cmd.ExecuteReader();
+                var Reader = cmd.ExecuteReader();
 
                 while (Reader.Read())
                 {
@@ -3296,20 +3296,20 @@ namespace HeroesProfile_Backend
 
         private void insertUrlIntoReplayUrls(LambdaJson.ReplayData data, MySqlConnection conn)
         {
-            using (MySqlCommand cmd = conn.CreateCommand())
+            using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "INSERT INTO replay_urls (replayID, game_date, game_type, url) VALUES (" +
                     "\"" + replayID + "\"" + "," +
                     "\"" + data.Date.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
                     "\"" + data.GameType_id + "\"" + "," +
                     "\"" + replayURL + "\"" + ")";
-                MySqlDataReader Reader = cmd.ExecuteReader();
+                var Reader = cmd.ExecuteReader();
             }
         }
 
         private string saveToSeasonGameVersion(DateTime game_date, string game_version, MySqlConnection conn)
         {
-            string season = "";
+            var season = "";
 
 
 
@@ -3321,13 +3321,13 @@ namespace HeroesProfile_Backend
                 }
             }
 
-            using (MySqlCommand cmd = conn.CreateCommand())
+            using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = "INSERT IGNORE INTO season_game_versions (season, game_version) VALUES (" +
                     season + "," +
                     "\"" + game_version + "\"" + ")";
                 Console.WriteLine(cmd.CommandText);
-                MySqlDataReader Reader = cmd.ExecuteReader();
+                var Reader = cmd.ExecuteReader();
             }
 
 
@@ -3337,11 +3337,11 @@ namespace HeroesProfile_Backend
 
         private void insertIntoReplaysNotProcessed(string replayID, string parsedID, string region, string game_type, string game_length, string game_date, string game_map, string game_version, string size, string parsed_date, string url, string processed, string errorMessage)
         {
-            using (MySqlConnection conn = new MySqlConnection(db_connect_string))
+            using (var conn = new MySqlConnection(db_connect_string))
             {
                 conn.Open();
 
-                using (MySqlCommand cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES (" +
                         "\"" + replayID + "\"" + "," +
@@ -3372,14 +3372,14 @@ namespace HeroesProfile_Backend
                         "url = VALUES(url)," +
                         "processed = VALUES(processed)," +
                         "failure_status = VALUES(failure_status)";
-                    MySqlDataReader Reader = cmd.ExecuteReader();
+                    var Reader = cmd.ExecuteReader();
                 }
             }
         }
 
         public ParseStormReplay(Uri replayURL)
         {
-            string globalJson = "";
+            var globalJson = "";
             var httpWebRequest = (HttpWebRequest)WebRequest.Create("https://a73l75cbzg.execute-api.eu-west-1.amazonaws.com/default/parse-hots");
 
             httpWebRequest.Method = "POST";
@@ -3387,7 +3387,7 @@ namespace HeroesProfile_Backend
 
             using (var streamWriter = new StreamWriter(httpWebRequest.GetRequestStream()))
             {
-                string json = new JavaScriptSerializer().Serialize(new
+                var json = new JavaScriptSerializer().Serialize(new
                 {
                     //input = "http://hotsapi.s3-website-eu-west-1.amazonaws.com/c5a49c21-d3d0-c8d9-c904-b3d09feea5e9.StormReplay",
                     input = replayURL,
@@ -3407,7 +3407,7 @@ namespace HeroesProfile_Backend
                 globalJson = result;
             }
 
-            LambdaJson.ReplayData data = LambdaJson.ReplayData.FromJson(globalJson);
+            var data = LambdaJson.ReplayData.FromJson(globalJson);
 
 
 
