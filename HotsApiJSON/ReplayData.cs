@@ -69,12 +69,12 @@ namespace HotsApiJSON
 
     public partial class ReplayData
     {
-        public static ReplayData[] FromJson(string json) => JsonConvert.DeserializeObject<ReplayData[]>(json, HotsApiJSON.Converter.Settings);
+        public static ReplayData[] FromJson(string json) => JsonConvert.DeserializeObject<ReplayData[]>(json, Converter.Settings);
     }
 
     public static class Serialize
     {
-        public static string ToJson(this ReplayData[] self) => JsonConvert.SerializeObject(self, HotsApiJSON.Converter.Settings);
+        public static string ToJson(this ReplayData[] self) => JsonConvert.SerializeObject(self, Converter.Settings);
     }
 
     internal static class Converter
