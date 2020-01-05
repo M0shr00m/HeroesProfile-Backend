@@ -2,17 +2,15 @@
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-
 using MySql.Data.MySqlClient;
 using System.Net;
 using System.IO;
-
 using System.Text.RegularExpressions;
+
 namespace HeroesProfile_Backend
 {
-    class GrabHotsApiData
+    internal class GrabHotsApiData
     {
         private string _dbConnectString = new DB_Connect().heroesprofile_config;
         private Dictionary<string, string> _heroes = new Dictionary<string, string>();
