@@ -11,8 +11,7 @@ using Newtonsoft.Json;
 
 namespace HeroesProfile_Backend
 {
-
-    class ParseStormReplay
+    internal class ParseStormReplay
     {
         private string db_connect_string = new DB_Connect().heroesprofile_config;
         public LambdaReplayData data = new LambdaReplayData();
@@ -83,7 +82,6 @@ namespace HeroesProfile_Backend
                 using (var streamReader = new StreamReader(httpResponse.GetResponseStream()))
                 {
                     result = streamReader.ReadToEnd();
-                    //Console.WriteLine(result);
                     globalJson = result;
                 }
 
