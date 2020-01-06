@@ -6,15 +6,14 @@
 //
 //    var replayData = ReplayData.FromJson(jsonString);
 
-namespace HeroesProfile_Backend
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+
+namespace HeroesProfile_Backend.Models
 {
-    using System;
-    using System.Collections.Generic;
-
-    using System.Globalization;
-    using Newtonsoft.Json;
-    using Newtonsoft.Json.Converters;
-
     public partial class ReplayData
     {
         [JsonProperty("id")]

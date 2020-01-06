@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace HeroesProfile_Backend
+﻿namespace HeroesProfile_Backend.Models
 {
-    class ReplaysNotProcessed
+    internal class ReplaysNotProcessed
     {
         public string replayID { get; set; }
         public string region { get; set; }
