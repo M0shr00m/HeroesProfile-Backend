@@ -59,7 +59,7 @@ namespace HeroesProfile_Backend
             try
             {
                 var globalJson = "";
-                var httpWebRequest = (HttpWebRequest) WebRequest.Create("https://a73l75cbzg.execute-api.eu-west-1.amazonaws.com/default/parse-hots");
+                var httpWebRequest = (HttpWebRequest) WebRequest.Create("/*Need To add Correct EndPoint Through ENV*/");
 
                 httpWebRequest.Method = "POST";
                 httpWebRequest.Timeout = 1000000;
