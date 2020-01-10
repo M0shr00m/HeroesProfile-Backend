@@ -2001,6 +2001,7 @@ namespace HeroesProfile_Backend
                                   "hero_level, " +
                                   "hero, " +
                                   "mirror, " +
+                                  "region, " +
                                   "win_loss, " +
                                   "game_time, " +
                                   "kills, " +
@@ -2059,6 +2060,7 @@ namespace HeroesProfile_Backend
                                    "\"" + hero_level + "\"" + "," +
                                    "\"" + player.Hero_id + "\"" + "," +
                                    "\"" + player.Mirror + "\"" + "," +
+                                   "\"" + data.Region + "\"" + "," +
                                    "\"" + win_loss + "\"" + "," +
 
                                    "\"" + data.Length.UtcDateTime.TimeOfDay.TotalSeconds + "\"" + "," +
@@ -2145,85 +2147,6 @@ namespace HeroesProfile_Backend
                 var Reader = cmd.ExecuteReader();
             }
         }
-
-        private void updateMatchups(LambdaJson.ReplayData data, MySqlConnection conn)
-        {
-            foreach (var player in data.Players)
-            {
-                var win_loss = 0;
-                win_loss = player.Winner ? 1 : 0;
-
-
-                if (player.Score == null) continue;
-                var hero_level = 0;
-
-                if (player.HeroLevel < 5)
-                {
-                    hero_level = 1;
-
-                }
-                else if (player.HeroLevel >= 5 && player.HeroLevel < 10)
-                {
-                    hero_level = 5;
-                }
-                else if (player.HeroLevel >= 10 && player.HeroLevel < 15)
-                {
-                    hero_level = 10;
-                }
-                else if (player.HeroLevel >= 15 && player.HeroLevel < 20)
-                {
-                    hero_level = 15;
-                }
-                else if (player.HeroLevel >= 20)
-                {
-                    hero_level = 20;
-                }
-
-                foreach (var p in data.Players)
-                {
-                    if (p.BlizzId == player.BlizzId) continue;
-                    using var cmd = conn.CreateCommand();
-                    cmd.CommandText = p.Team == player.Team
-                                              ? "INSERT INTO global_hero_matchups_ally (game_version, game_type, league_tier , game_map, hero_level, hero, ally, mirror, win_loss, games_played) VALUES ("
-                                              : "INSERT INTO global_hero_matchups_enemy (game_version, game_type, league_tier, game_map, hero_level, hero, enemy, mirror, win_loss, games_played) VALUES (";
-                    cmd.CommandText += "\"" + data.VersionSplit + "\"" + "," +
-                                       "\"" + data.GameType_id + "\"" + "," +
-                                       "\"" + player.player_league_tier + "\"" + "," +
-                                       "\"" + data.GameMap_id + "\"" + "," +
-                                       "\"" + hero_level + "\"" + "," +
-                                       "\"" + player.Hero_id + "\"" + "," +
-                                       "\"" + p.Hero_id + "\"" + "," +
-                                       "\"" + p.Mirror + "\"" + "," +
-                                       "\"" + win_loss + "\"" + "," +
-                                       1 + ")";
-
-
-                    cmd.CommandText += " ON DUPLICATE KEY UPDATE " +
-                                       "game_version = VALUES(game_version), " +
-                                       "game_type = VALUES(game_type), " +
-                                       "league_tier = VALUES(league_tier), " +
-                                       "game_map = VALUES(game_map), " +
-                                       "hero_level = VALUES(hero_level), " +
-                                       "hero = VALUES(hero), ";
-                    if (p.Team == player.Team)
-                    {
-                        cmd.CommandText += "ally = VALUES(ally), ";
-
-                    }
-                    else
-                    {
-                        cmd.CommandText += "enemy = VALUES(enemy), ";
-                    }
-
-                    cmd.CommandText += "mirror = VALUES(mirror), ";
-                    cmd.CommandText += "win_loss = VALUES(win_loss), " +
-                                       "games_played = games_played + VALUES(games_played)";
-                    //Console.WriteLine(cmd.CommandText);
-                    var Reader = cmd.ExecuteReader();
-                }
-            }
-        }
-
         private int insertTalentCombo(string hero, int level_one, int level_four, int level_seven, int level_ten, int level_thirteen, int level_sixteen, int level_twenty)
         {
             var comb_id = 0;
@@ -2365,8 +2288,10 @@ namespace HeroesProfile_Backend
                                   "role_league_tier, " +
                                   "game_map, " +
                                   "hero_level, " +
-                                  "hero, mirror," +
-                                  " win_loss, " +
+                                  "hero, " +
+                                  "mirror, " +
+                                  "region, " +
+                                  "win_loss, " +
                                   "talent_combination_id, " +
                                   "game_time, " +
                                   "kills, " +
@@ -2415,6 +2340,7 @@ namespace HeroesProfile_Backend
                                    "\"" + hero_level + "\"" + "," +
                                    "\"" + player.Hero_id + "\"" + "," +
                                    "\"" + player.Mirror + "\"" + "," +
+                                   "\"" + data.Region + "\"" + "," +
                                    "\"" + win_loss + "\"" + ",";
 
 
@@ -2797,6 +2723,7 @@ namespace HeroesProfile_Backend
                                       "hero_level, " +
                                       "hero, " +
                                       "mirror, " +
+                                      "region, " +
                                       "win_loss, " +
                                       "level, " +
                                       "talent, " +
@@ -2846,6 +2773,7 @@ namespace HeroesProfile_Backend
                                       hero_level + "," +
                                       player.Hero_id + "," +
                                       player.Mirror + "," +
+                                      data.Region + "," +
                                       "\"" + win_loss + "\"" + "," +
                                       level + ",";
 
@@ -3034,9 +2962,11 @@ namespace HeroesProfile_Backend
 
             using (var cmd = conn.CreateCommand())
             {
-                cmd.CommandText = "INSERT IGNORE INTO season_game_versions (season, game_version) VALUES (" +
-                                  season + "," +
-                                  "\"" + game_version + "\"" + ")";
+                cmd.CommandText = "INSERT IGNORE INTO season_game_versions (season, game_version, date_added) VALUES (" +
+                    season + "," +
+                    "\"" + game_version + "\"" + "," +
+                    "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" +
+                    ")";
                 Console.WriteLine(cmd.CommandText);
                 cmd.ExecuteReader();
             }
