@@ -884,9 +884,6 @@ namespace HeroesProfile_Backend
                                               "\"" + data.Date.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + ")";
 
                             cmd.CommandText += " ON DUPLICATE KEY UPDATE " +
-                                               "blizz_id = VALUES(blizz_id), " +
-                                               "battletag = VALUES(battletag), " +
-                                               "region = VALUES(region), " +
                                                "account_level = IF(VALUES(account_level) > account_level, VALUES(account_level), account_level), " +
                                                "latest_game = IF(VALUES(latest_game) > latest_game, VALUES(latest_game), latest_game) ";
                             cmd.CommandTimeout = 0;
@@ -941,6 +938,8 @@ namespace HeroesProfile_Backend
                     }
 
 
+                    //// Add back in when running MMR Recalcs
+                    /*
                     if (game_types[data.Mode] == "5")
                     {
                         using var cmd = conn.CreateCommand();
@@ -952,6 +951,7 @@ namespace HeroesProfile_Backend
                         // Console.WriteLine(cmd.CommandText);
                         var Reader = cmd.ExecuteReader();
                     }
+                    */
 
 
                     foreach (var ban in data.Bans)
@@ -1027,9 +1027,6 @@ namespace HeroesProfile_Backend
                         }
 
                     }
-
-                    //data = calculateMMR(data, conn);
-
 
                     for (var i = 0; i < data.Players.Length; i++)
                     {
@@ -1524,9 +1521,6 @@ namespace HeroesProfile_Backend
                                               "\"" + data.Date.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + ")";
 
                             cmd.CommandText += " ON DUPLICATE KEY UPDATE " +
-                                               "blizz_id = VALUES(blizz_id), " +
-                                               "battletag = VALUES(battletag), " +
-                                               "region = VALUES(region), " +
                                                "account_level = IF(VALUES(account_level) > account_level, VALUES(account_level), account_level), " +
                                                "latest_game = IF(VALUES(latest_game) > latest_game, VALUES(latest_game), latest_game) ";
                             cmd.CommandTimeout = 0;
