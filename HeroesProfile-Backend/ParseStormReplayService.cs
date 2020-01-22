@@ -154,7 +154,6 @@ namespace HeroesProfile_Backend
                     if (data.Version != null)
                     {
                         var version = new Version(data.Version);
-                        data.VersionSplit = version.Minor + "." + version.Build + "." + version.Revision + "." + data.VersionBuild;
 
                         foreach (var player in data.Players)
                         {
@@ -181,8 +180,6 @@ namespace HeroesProfile_Backend
                         //if (data.Mode != "Brawl" && data.Mode != null && data.Date != null && data.Length != null && data.Region != null)
                         if (data.Mode != null && data.Date != null && data.Length != null && data.Region != null)
                         {
-
-
                             var orderedPlayers = new LambdaJson.Player[10];
 
                             var team1 = 0;
@@ -370,10 +367,6 @@ namespace HeroesProfile_Backend
                         //Console.WriteLine(cmd.CommandText);
                         var reader = cmd.ExecuteReader();
                     }
-
-
-                    //}
-
                 }
             }
             catch (Exception e)
@@ -540,7 +533,6 @@ namespace HeroesProfile_Backend
                     if (data.Version != null)
                     {
                         var version = new Version(data.Version);
-                        data.VersionSplit = version.Minor + "." + version.Build + "." + version.Revision + "." + data.VersionBuild;
 
                         foreach (var player in data.Players)
                         {
@@ -914,7 +906,7 @@ namespace HeroesProfile_Backend
                                               "\"" + parsedStormReplay.OverallData.Date.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
                                               parsedStormReplay.OverallData.Length.UtcDateTime.TimeOfDay.TotalSeconds + "," +
                                               parsedStormReplay.Maps[parsedStormReplay.OverallData.Map] + "," +
-                                              "\"" + parsedStormReplay.OverallData.VersionSplit + "\"" + "," +
+                                              "\"" + parsedStormReplay.OverallData.Version + "\"" + "," +
                                               parsedStormReplay.OverallData.Region + "," +
                                               "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + ")";
                         }
@@ -928,7 +920,7 @@ namespace HeroesProfile_Backend
                                               "\"" + parsedStormReplay.OverallData.Date.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
                                               parsedStormReplay.OverallData.Length.UtcDateTime.TimeOfDay.TotalSeconds + "," +
                                               parsedStormReplay.Maps[parsedStormReplay.OverallData.Map] + "," +
-                                              "\"" + parsedStormReplay.OverallData.VersionSplit + "\"" + "," +
+                                              "\"" + parsedStormReplay.OverallData.Version + "\"" + "," +
                                               parsedStormReplay.OverallData.Region + "," +
                                               "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + ")";
                         }
@@ -1267,9 +1259,9 @@ namespace HeroesProfile_Backend
                     }
                     //saveMasterMMRData(data, conn);
 
-                    if (parsedStormReplay.SeasonsGameVersions.ContainsKey(parsedStormReplay.OverallData.VersionSplit))
+                    if (parsedStormReplay.SeasonsGameVersions.ContainsKey(parsedStormReplay.OverallData.Version))
                     {
-                        if (Convert.ToInt32(parsedStormReplay.SeasonsGameVersions[parsedStormReplay.OverallData.VersionSplit]) < 13) return;
+                        if (Convert.ToInt32(parsedStormReplay.SeasonsGameVersions[parsedStormReplay.OverallData.Version]) < 13) return;
                         if (isBrawl)
                         {
                             UpdateGlobalHeroData(parsedStormReplay.OverallData, conn);
@@ -1278,18 +1270,18 @@ namespace HeroesProfile_Backend
                         }
                         else
                         {
-                            UpdateGameModeTotalGames(Convert.ToInt32(parsedStormReplay.SeasonsGameVersions[parsedStormReplay.OverallData.VersionSplit]), parsedStormReplay, conn);
+                            UpdateGameModeTotalGames(Convert.ToInt32(parsedStormReplay.SeasonsGameVersions[parsedStormReplay.OverallData.Version]), parsedStormReplay, conn);
                             InsertUrlIntoReplayUrls(parsedStormReplay, conn);
                         }
                         
                     }
                     else
                     {
-                        var season = SaveToSeasonGameVersion(DateTime.Parse(parsedStormReplay.OverallData.Date.ToString("yyyy-MM-dd HH:mm:ss")), parsedStormReplay.OverallData.VersionSplit, parsedStormReplay, conn);
-                        parsedStormReplay.SeasonsGameVersions.Add(parsedStormReplay.OverallData.VersionSplit, season);
+                        var season = SaveToSeasonGameVersion(DateTime.Parse(parsedStormReplay.OverallData.Date.ToString("yyyy-MM-dd HH:mm:ss")), parsedStormReplay.OverallData.Version, parsedStormReplay, conn);
+                        parsedStormReplay.SeasonsGameVersions.Add(parsedStormReplay.OverallData.Version, season);
                         //Save Game Version to table
                         //Add it to dic
-                        if (Convert.ToInt32(parsedStormReplay.SeasonsGameVersions[parsedStormReplay.OverallData.VersionSplit]) < 13) return;
+                        if (Convert.ToInt32(parsedStormReplay.SeasonsGameVersions[parsedStormReplay.OverallData.Version]) < 13) return;
                         if (isBrawl)
                         {
                             UpdateGlobalHeroData(parsedStormReplay.OverallData, conn);
@@ -1298,7 +1290,7 @@ namespace HeroesProfile_Backend
                         }
                         else
                         {
-                            UpdateGameModeTotalGames(Convert.ToInt32(parsedStormReplay.SeasonsGameVersions[parsedStormReplay.OverallData.VersionSplit]), parsedStormReplay, conn);
+                            UpdateGameModeTotalGames(Convert.ToInt32(parsedStormReplay.SeasonsGameVersions[parsedStormReplay.OverallData.Version]), parsedStormReplay, conn);
                             InsertUrlIntoReplayUrls(parsedStormReplay, conn);
                         }
 
@@ -1313,7 +1305,7 @@ namespace HeroesProfile_Backend
                         InsertIntoReplaysNotProcessed(parsedStormReplay.ReplayId.ToString(), "NULL", parsedStormReplay.OverallData.Region.ToString(), 
                                 parsedStormReplay.OverallData.Mode, parsedStormReplay.OverallData.Length.UtcDateTime.TimeOfDay.TotalSeconds.ToString(),
                                 parsedStormReplay.OverallData.Date.ToString("yyyy-MM-dd HH:mm:ss"), parsedStormReplay.OverallData.Map,
-                                parsedStormReplay.OverallData.VersionSplit, "0", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), parsedStormReplay.ReplayUrl.ToString(),
+                                parsedStormReplay.OverallData.Version, "0", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), parsedStormReplay.ReplayUrl.ToString(),
                                 "NULL", "Bad Hero Name");
 
                         //save as bad hero name
@@ -1324,7 +1316,7 @@ namespace HeroesProfile_Backend
                         InsertIntoReplaysNotProcessed(parsedStormReplay.ReplayId.ToString(), "NULL", parsedStormReplay.OverallData.Region.ToString(),
                                 parsedStormReplay.OverallData.Mode, parsedStormReplay.OverallData.Length.UtcDateTime.TimeOfDay.TotalSeconds.ToString(),
                                 parsedStormReplay.OverallData.Date.ToString("yyyy-MM-dd HH:mm:ss"), parsedStormReplay.OverallData.Map,
-                                parsedStormReplay.OverallData.VersionSplit, "0", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), parsedStormReplay.ReplayUrl.ToString(),
+                                parsedStormReplay.OverallData.Version, "0", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), parsedStormReplay.ReplayUrl.ToString(),
                                 "NULL", "Bad Talent Name");
 
                         //save as bad talent name
@@ -1336,7 +1328,7 @@ namespace HeroesProfile_Backend
                         InsertIntoReplaysNotProcessed(parsedStormReplay.ReplayId.ToString(), "NULL", parsedStormReplay.OverallData.Region.ToString(), 
                                 parsedStormReplay.OverallData.Mode, parsedStormReplay.OverallData.Length.UtcDateTime.TimeOfDay.TotalSeconds.ToString(),
                                 parsedStormReplay.OverallData.Date.ToString("yyyy-MM-dd HH:mm:ss"), parsedStormReplay.OverallData.Map,
-                                parsedStormReplay.OverallData.VersionSplit, "0",
+                                parsedStormReplay.OverallData.Version, "0",
                                 DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), parsedStormReplay.ReplayUrl.ToString(),
                                 "NULL", "Undetermined");
                     }
@@ -1479,7 +1471,7 @@ namespace HeroesProfile_Backend
                                   "regen_globes, " +
                                   "games_played" +
                                   ") VALUES (" +
-                                  "\"" + data.VersionSplit + "\"" + ",";
+                                  "\"" + data.Version + "\"" + ",";
                 if (data.Mode != "Brawl")
                 {
                     cmd.CommandText += "\"" + data.GameType_id + "\"" + "," +
@@ -1757,7 +1749,7 @@ namespace HeroesProfile_Backend
                                   "regen_globes, " +
                                   "games_played" +
                                   ") VALUES (" +
-                                  "\"" + parsedStormReplay.OverallData.VersionSplit + "\"" + ",";
+                                  "\"" + parsedStormReplay.OverallData.Version + "\"" + ",";
                 cmd.CommandText += "\"" + parsedStormReplay.OverallData.GameType_id + "\"" + "," +
                                    "\"" + 0 + "\"" + "," +
                                    "\"" + 0 + "\"" + "," +
@@ -2164,7 +2156,7 @@ namespace HeroesProfile_Backend
                                       "spell_damage, " +
                                       "regen_globes, " +
                                       "games_played) VALUES (" +
-                                      "\"" + parsedStormReplay.OverallData.VersionSplit + "\"" + "," +
+                                      "\"" + parsedStormReplay.OverallData.Version + "\"" + "," +
                                       parsedStormReplay.OverallData.GameType_id + "," +
                                       0 + "," +
                                       0 + "," +
