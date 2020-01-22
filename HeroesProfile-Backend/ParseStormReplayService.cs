@@ -49,7 +49,7 @@ namespace HeroesProfile_Backend
             try
             {
                 var globalJson = "";
-                var httpWebRequest = (HttpWebRequest) WebRequest.Create("/*Need To add Correct EndPoint Through ENV*/");
+                var httpWebRequest = (HttpWebRequest) WebRequest.Create(_apiSettings.lambda_parser_endpoint_url);
 
                 httpWebRequest.Method = "POST";
                 httpWebRequest.Timeout = 1000000;
@@ -60,8 +60,8 @@ namespace HeroesProfile_Backend
                     {
                             //input = "http://hotsapi.s3-website-eu-west-1.amazonaws.com/c5a49c21-d3d0-c8d9-c904-b3d09feea5e9.StormReplay",
                             input = replayUrl,
-                            access = "", //Need to pull from config file or ENV
-                            secret = "" //Need to pull from config file or ENV
+                            access = _apiSettings.lambda_parser_endpoint_access,
+                            secret = _apiSettings.lambda_parser_endpoint_secret 
                     });
 
                     streamWriter.Write(json);
@@ -429,7 +429,7 @@ namespace HeroesProfile_Backend
             try
             {
                 var globalJson = "";
-                var httpWebRequest = (HttpWebRequest) WebRequest.Create("https://a73l75cbzg.execute-api.eu-west-1.amazonaws.com/default/parse-hots");
+                var httpWebRequest = (HttpWebRequest) WebRequest.Create(_apiSettings.lambda_parser_endpoint_url);
 
                 httpWebRequest.Method = "POST";
                 httpWebRequest.Timeout = 1000000;
@@ -440,8 +440,8 @@ namespace HeroesProfile_Backend
                     {
                             //input = "http://hotsapi.s3-website-eu-west-1.amazonaws.com/c5a49c21-d3d0-c8d9-c904-b3d09feea5e9.StormReplay",
                             input = replayUrl,
-                            access = "", //Need to pull from config file or ENV
-                            secret = "" //Need to pull from config file or ENV
+                            access = _apiSettings.lambda_parser_endpoint_access,
+                            secret = _apiSettings.lambda_parser_endpoint_secret 
                     });
 
                     streamWriter.Write(json);
@@ -2416,7 +2416,7 @@ namespace HeroesProfile_Backend
         public void ParseStormReplay(Uri replayUrl)
         {
             var globalJson = "";
-            var httpWebRequest = (HttpWebRequest) WebRequest.Create("https://a73l75cbzg.execute-api.eu-west-1.amazonaws.com/default/parse-hots");
+            var httpWebRequest = (HttpWebRequest) WebRequest.Create(_apiSettings.lambda_parser_endpoint_url);
 
             httpWebRequest.Method = "POST";
             httpWebRequest.Timeout = 1000000;
@@ -2427,8 +2427,8 @@ namespace HeroesProfile_Backend
                 {
                         //input = "http://hotsapi.s3-website-eu-west-1.amazonaws.com/c5a49c21-d3d0-c8d9-c904-b3d09feea5e9.StormReplay",
                         input = replayUrl,
-                        access = "", //Need to pull from config file or ENV
-                        secret = "" //Need to pull from config file or ENV
+                        access = _apiSettings.lambda_parser_endpoint_access,
+                        secret = _apiSettings.lambda_parser_endpoint_secret 
                 });
 
                 streamWriter.Write(json);
