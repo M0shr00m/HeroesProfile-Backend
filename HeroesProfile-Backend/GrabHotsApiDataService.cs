@@ -11,9 +11,12 @@ using HeroesProfile_Backend.Models;
 
 namespace HeroesProfile_Backend
 {
-     public class GrabHotsApiData
-    {
-        private string _dbConnectString = new DB_Connect().heroesprofile_config;
+     public class GrabHotsApiDataService
+     {
+         private readonly ApiSettings _apiSettings;
+         private readonly DbSettings _dbSettings;
+         private readonly string _connectionString;
+         private ParseStormReplayService _parseStormReplayService;
         private Dictionary<string, string> _heroes = new Dictionary<string, string>();
         private Dictionary<string, string> _heroesTranslations = new Dictionary<string, string>();
         private Dictionary<string, string> _heroesAlt = new Dictionary<string, string>();
@@ -34,12 +37,20 @@ namespace HeroesProfile_Backend
 
 
 
-        private ConcurrentDictionary<long, ParseStormReplay> _replayDataGrabbed = new ConcurrentDictionary<long, ParseStormReplay>();
+        private ConcurrentDictionary<long, ParsedStormReplay> _replayDataGrabbed = new ConcurrentDictionary<long, ParsedStormReplay>();
 
-        public GrabHotsApiData()
+        public GrabHotsApiDataService(ParseStormReplayService parseStormReplayService, ApiSettings apiSettings, DbSettings dbSettings)
+        {
+            _parseStormReplayService = parseStormReplayService;
+            _dbSettings = dbSettings;
+            _apiSettings = apiSettings;
+            _connectionString = ConnectionStringBuilder.BuildConnectionString(_dbSettings);
+        }
+        
+        public void GrabHotsApiData()
         {
             var maxValue = 0;
-            using var conn = new MySqlConnection(_dbConnectString);
+            using var conn = new MySqlConnection(_connectionString);
             conn.Open();
 
 
@@ -315,12 +326,13 @@ namespace HeroesProfile_Backend
                 {
                     //
                     Console.WriteLine("Running Reply: " + item);
-                    var p = new ParseStormReplay(Convert.ToInt64(item), new Uri(_notProcessedReplays[item].url, UriKind.Absolute), _notProcessedReplays[item], _maps, _mapsTranslations, _gameTypes, _talents, _seasonsGameVersions, _mmrIds, _seasons, _heroes, _heroesTranslations, _mapsShort, _mmrIds, _role, _heroesAttr);
+                    
+                    var p = _parseStormReplayService.ParseStormReplay(Convert.ToInt64(item), new Uri(_notProcessedReplays[item].url, UriKind.Absolute), _notProcessedReplays[item], _maps, _mapsTranslations, _gameTypes, _talents, _seasonsGameVersions, _mmrIds, _seasons, _heroes, _heroesTranslations, _mapsShort, _mmrIds, _role, _heroesAttr);
                     _replayDataGrabbed.TryAdd(Convert.ToInt64(item), p);
 
                 });
 
-            var sortedReplayDataGrabbed = new SortedDictionary<long, ParseStormReplay>();
+            var sortedReplayDataGrabbed = new SortedDictionary<long, ParsedStormReplay>();
 
             foreach (var item in _replayDataGrabbed.Keys)
             {
@@ -335,19 +347,11 @@ namespace HeroesProfile_Backend
                 item =>
                 {
                     if (sortedReplayDataGrabbed[item] == null) return;
-                    if (sortedReplayDataGrabbed[item].dupe) return;
-                    if (sortedReplayDataGrabbed[item].overallData == null) return;
-                    if (sortedReplayDataGrabbed[item].overallData.Mode == null) return;
+                    if (sortedReplayDataGrabbed[item].Dupe) return;
+                    if (sortedReplayDataGrabbed[item].OverallData == null) return;
+                    if (sortedReplayDataGrabbed[item].OverallData.Mode == null) return;
                     Console.WriteLine("Saving replay data for: " + item);
-                    if (sortedReplayDataGrabbed[item].overallData.Mode != "Brawl")
-                    {
-                        sortedReplayDataGrabbed[item].saveReplayData(sortedReplayDataGrabbed[item].overallData);
-                    }
-                    else
-                    {
-                        sortedReplayDataGrabbed[item].saveReplayDataBrawl(sortedReplayDataGrabbed[item].overallData);
-
-                    }
+                    _parseStormReplayService.SaveReplayData(sortedReplayDataGrabbed[item], isBrawl: sortedReplayDataGrabbed[item].OverallData.Mode == "Brawl");
                 });
 
             /*
@@ -429,10 +433,10 @@ namespace HeroesProfile_Backend
                     replaysLeftCounter--;
 
                     Console.WriteLine("Running Reply: " + item + " - " + replaysLeftCounter + " left to run");
-                    var p = new ParseStormReplay(item, _replaysToRun[item].Url, _replaysToRun[item], _maps, _mapsTranslations, _gameTypes, _talents, _seasonsGameVersions, _mmrIds, _seasons, _heroes, _heroesTranslations, _mapsShort, _mmrIds, _role, _heroesAttr);
+                    var p = _parseStormReplayService.ParseStormReplay(item, _replaysToRun[item].Url, _replaysToRun[item], _maps, _mapsTranslations, _gameTypes, _talents, _seasonsGameVersions, _mmrIds, _seasons, _heroes, _heroesTranslations, _mapsShort, _mmrIds, _role, _heroesAttr);
                     _replayDataGrabbed.TryAdd(item, p);
                 });
-                var sortedReplayDataGrabbed = new SortedDictionary<long, ParseStormReplay>();
+                var sortedReplayDataGrabbed = new SortedDictionary<long, ParsedStormReplay>();
 
                 foreach (var item in _replayDataGrabbed.Keys)
                 {
@@ -448,19 +452,11 @@ namespace HeroesProfile_Backend
                     item =>
                     {
                         if (sortedReplayDataGrabbed[item] == null) return;
-                        if (sortedReplayDataGrabbed[item].dupe) return;
-                        if (sortedReplayDataGrabbed[item].overallData == null) return;
-                        if (sortedReplayDataGrabbed[item].overallData.Mode == null) return;
+                        if (sortedReplayDataGrabbed[item].Dupe) return;
+                        if (sortedReplayDataGrabbed[item].OverallData == null) return;
+                        if (sortedReplayDataGrabbed[item].OverallData.Mode == null) return;
                         Console.WriteLine("Saving replay data for: " + item);
-                        if (sortedReplayDataGrabbed[item].overallData.Mode != "Brawl")
-                        {
-                            sortedReplayDataGrabbed[item].saveReplayData(sortedReplayDataGrabbed[item].overallData);
-                        }
-                        else
-                        {
-                            sortedReplayDataGrabbed[item].saveReplayDataBrawl(sortedReplayDataGrabbed[item].overallData);
-
-                        }
+                            _parseStormReplayService.SaveReplayData(sortedReplayDataGrabbed[item], isBrawl: sortedReplayDataGrabbed[item].OverallData.Mode == "Brawl");
 
                     });
                 /*

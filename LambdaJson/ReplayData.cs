@@ -36,8 +36,6 @@ namespace LambdaJson
         [JsonProperty("version_build")]
         public long VersionBuild { get; set; }
 
-        public string VersionSplit { get; set; }
-
         [JsonProperty("bans")]
         public object[][] Bans { get; set; }
 

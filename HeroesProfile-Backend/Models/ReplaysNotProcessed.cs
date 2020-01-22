@@ -1,6 +1,6 @@
 ﻿namespace HeroesProfile_Backend.Models
 {
-    internal class ReplaysNotProcessed
+    public class ReplaysNotProcessed
     {
         public string replayID { get; set; }
         public string region { get; set; }
