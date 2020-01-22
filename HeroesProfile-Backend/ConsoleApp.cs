@@ -6,10 +6,12 @@ namespace HeroesProfile_Backend
     public class ConsoleApp
     {
         private readonly IConfiguration _configuration;
+        private readonly GrabHotsApiDataService _grabHotsApiDataService;
 
-        public ConsoleApp(IConfiguration configuration)
+        public ConsoleApp(IConfiguration configuration, GrabHotsApiDataService grabHotsApiDataService)
         {
             _configuration = configuration;
+            _grabHotsApiDataService = grabHotsApiDataService;
         }
         
         public void Run()
@@ -19,7 +21,7 @@ namespace HeroesProfile_Backend
             {
                 try
                 {
-                    var data = new GrabHotsApiData();
+                    _grabHotsApiDataService.GrabHotsApiData();
 
                 }
                 catch (Exception e)
