@@ -881,8 +881,7 @@ namespace HeroesProfile_Backend
 
                         using (var cmd = conn.CreateCommand())
                         {
-
-                            cmd.CommandText = "SELECT player_id from battletags where battletag = " + "\"" + player.BattletagName + "#" + player.BattletagId + "\"";
+                            cmd.CommandText = "SELECT player_id from battletags where battletag = " + "\"" + player.BattletagName + "#" + player.BattletagId + "\"" + " AND region = " + parsedStormReplay.OverallData.Region;
                             cmd.CommandTimeout = 0;
                             var reader = cmd.ExecuteReader();
 
