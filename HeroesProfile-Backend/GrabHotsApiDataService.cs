@@ -309,7 +309,7 @@ namespace HeroesProfile_Backend
             }
             else if (brawlMaxValue > maxValue)
             {
-                maxValue = (brawlMaxValue + 1);
+                maxValue = brawlMaxValue;
             }
             maxValue++;
 
