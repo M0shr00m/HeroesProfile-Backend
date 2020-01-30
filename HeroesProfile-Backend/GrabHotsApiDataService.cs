@@ -298,7 +298,6 @@ namespace HeroesProfile_Backend
                 }
             }
 
-            maxValue++;
             if (notProcessedMaxValue > maxValue)
             {
                 maxValue = notProcessedMaxValue;
@@ -312,6 +311,8 @@ namespace HeroesProfile_Backend
             {
                 maxValue = (brawlMaxValue + 1);
             }
+            maxValue++;
+
             //maxValue = 15757424;
             RecurseHotsApiCall(maxValue);
         }
