@@ -5,31 +5,35 @@ using System.IO;
 using System.Linq;
 using MySql.Data.MySqlClient;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using HeroesProfile_Backend.Models;
+using HeroesProfileDb.HeroesProfile;
+using HeroesProfileDb.HeroesProfileBrawl;
 using Newtonsoft.Json;
+using ReplaysNotProcessed = HeroesProfile_Backend.Models.ReplaysNotProcessed;
 
 namespace HeroesProfile_Backend
 {
     public class ParseStormReplayService
     {
         private readonly ApiSettings _apiSettings;
-        private readonly DbSettings _dbSettings;
-        private readonly string _connectionString;
+        private readonly HeroesProfileContext _context;
+        private readonly HeroesProfileBrawlContext _brawlContext;
 
-        public ParseStormReplayService(ApiSettings apiSettings, DbSettings dbSettings)
+        public ParseStormReplayService(ApiSettings apiSettings, HeroesProfileContext context, HeroesProfileBrawlContext brawlContext)
         {
-            _dbSettings = dbSettings;
             _apiSettings = apiSettings;
-            _connectionString = ConnectionStringBuilder.BuildConnectionString(_dbSettings);
+            _context = context;
+            _brawlContext = brawlContext;
         }
 
-        public ParsedStormReplay ParseStormReplay(long replayId, Uri replayUrl, HotsApiJSON.ReplayData hotsapiData, Dictionary<string, string> maps, 
+        public async Task<ParsedStormReplay> ParseStormReplay(long replayId, Uri replayUrl, HotsApiJSON.ReplayData hotsapiData, Dictionary<string, string> maps, 
                                                   Dictionary<string, string> mapsTranslations, Dictionary<string, string> gameTypes, Dictionary<string, string> talents, 
                                                   Dictionary<string, string> seasonsGameVersions, Dictionary<string, string> mmrIds, Dictionary<string, DateTime[]> seasons,
                                                   Dictionary<string, string> heroes, Dictionary<string, string> heroesTranslations, Dictionary<string, string> mapsShort,
                                                   Dictionary<string, string> mmrs, Dictionary<string, string> roles, Dictionary<string, string> heroesAttr)
         {
-            var parsedReplay = new ParsedStormReplay()
+            var parsedReplay = new ParsedStormReplay
             {
                     ReplayId = replayId,
                     ReplayUrl = replayUrl,
@@ -54,7 +58,7 @@ namespace HeroesProfile_Backend
                 httpWebRequest.Method = "POST";
                 httpWebRequest.Timeout = 1000000;
 
-                using (var streamWriter = new StreamWriter(httpWebRequest.GetRequestStream()))
+                await using (var streamWriter = new StreamWriter(httpWebRequest.GetRequestStream()))
                 {
                     var json = JsonConvert.SerializeObject(new
                     {
@@ -78,6 +82,16 @@ namespace HeroesProfile_Backend
 
                 if (Regex.Match(result, "Error parsing replay: UnexpectedResult").Success)
                 {
+                    await _context.ReplaysNotProcessed.AddAsync(new HeroesProfileDb.HeroesProfile.ReplaysNotProcessed
+                    {
+                        ReplayId = (int) replayId,
+                        ParsedId = null,
+                        Region = (int?) hotsapiData.Region,
+                        GameType = hotsapiData.GameType,
+                        GameLength = hotsapiData.GameLength.ToString(),
+
+                    });
+
                     using var conn = new MySqlConnection(_connectionString);
                     conn.Open();
                     using var cmd = conn.CreateCommand();
@@ -1386,12 +1400,9 @@ namespace HeroesProfile_Backend
 
         private static void UpdateGlobalHeroData(LambdaJson.ReplayData data, MySqlConnection conn)
         {
-            //
-
             foreach (var player in data.Players)
             {
                 var winLoss = player.Winner ? 1 : 0;
-
 
                 if (player.Score == null) continue;
                 var heroLevel = 0;
@@ -1399,8 +1410,6 @@ namespace HeroesProfile_Backend
                 if (player.HeroLevel < 5)
                 {
                     heroLevel = 1;
-                    heroLevel = 1;
-
                 }
                 else if (player.HeroLevel >= 5 && player.HeroLevel < 10)
                 {

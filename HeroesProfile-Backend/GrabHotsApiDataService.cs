@@ -8,14 +8,17 @@ using System.Net;
 using System.IO;
 using System.Text.RegularExpressions;
 using HeroesProfile_Backend.Models;
+using HeroesProfileDb.HeroesProfile;
+using HeroesProfileDb.HeroesProfileBrawl;
+using Microsoft.EntityFrameworkCore;
 
 namespace HeroesProfile_Backend
 {
      public class GrabHotsApiDataService
      {
+         private readonly HeroesProfileContext _context;
+         private readonly HeroesProfileBrawlContext _brawlContext;
          private readonly ApiSettings _apiSettings;
-         private readonly DbSettings _dbSettings;
-         private readonly string _connectionString;
          private ParseStormReplayService _parseStormReplayService;
         private Dictionary<string, string> _heroes = new Dictionary<string, string>();
         private Dictionary<string, string> _heroesTranslations = new Dictionary<string, string>();
@@ -28,276 +31,137 @@ namespace HeroesProfile_Backend
         private Dictionary<string, string> _gameTypes = new Dictionary<string, string>();
         private Dictionary<string, string> _talents = new Dictionary<string, string>();
         private Dictionary<string, string> _mmrIds = new Dictionary<string, string>();
-        private Dictionary<string, string> _leagueTiers = new Dictionary<string, string>();
         private Dictionary<string, DateTime[]> _seasons = new Dictionary<string, DateTime[]>();
         private Dictionary<string, string> _seasonsGameVersions = new Dictionary<string, string>();
-        private Dictionary<string, ReplaysNotProcessed> _notProcessedReplays = new Dictionary<string, ReplaysNotProcessed>();
-
+        private Dictionary<string, Models.ReplaysNotProcessed> _notProcessedReplays = new Dictionary<string, Models.ReplaysNotProcessed>();
         private Dictionary<long, HotsApiJSON.ReplayData> _replaysToRun = new Dictionary<long, HotsApiJSON.ReplayData>();
-
-
-
         private ConcurrentDictionary<long, ParsedStormReplay> _replayDataGrabbed = new ConcurrentDictionary<long, ParsedStormReplay>();
 
-        public GrabHotsApiDataService(ParseStormReplayService parseStormReplayService, ApiSettings apiSettings, DbSettings dbSettings)
+        public GrabHotsApiDataService(ParseStormReplayService parseStormReplayService, ApiSettings apiSettings,
+                                      HeroesProfileContext context, HeroesProfileBrawlContext brawlContext)
         {
             _parseStormReplayService = parseStormReplayService;
-            _dbSettings = dbSettings;
             _apiSettings = apiSettings;
-            _connectionString = ConnectionStringBuilder.BuildConnectionString(_dbSettings);
+            _context = context;
+            _brawlContext = brawlContext;
         }
         
-        public void GrabHotsApiData()
+        public async Task GrabHotsApiData()
         {
             var maxValue = 0;
-            using var conn = new MySqlConnection(_connectionString);
-            conn.Open();
 
+            var heroes = await _context.Heroes.Select(x => new {x.Id, x.Name, x.NewRole, x.AltName, x.ShortName, x.AttributeId}).ToListAsync();
 
-            using (var cmd = conn.CreateCommand())
+            foreach (var hero in heroes)
             {
-                cmd.CommandText = "SELECT tier_id, name FROM league_tiers";
-                var reader = cmd.ExecuteReader();
+                _heroes.Add(hero.Name, hero.Id.ToString());
+                _role.Add(hero.Name, hero.NewRole);
 
-                while (reader.Read())
+                if (!_heroesAlt.ContainsKey(hero.Name))
                 {
-                    _leagueTiers.Add(reader.GetString("name"), reader.GetString("tier_id"));
-                }
-            }
-
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = "SELECT id, name, new_role FROM heroes";
-                var reader = cmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    _heroes.Add(reader.GetString("name"), reader.GetString("id"));
-                    _role.Add(reader.GetString("name"), reader.GetString("new_role"));
-                }
-            }
-
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = "SELECT type_id, name FROM game_types";
-                var reader = cmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    _gameTypes.Add(reader.GetString("name").Replace(" ", ""), reader.GetString("type_id"));
-                }
-            }
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = "SELECT * FROM heroesprofile.heroes_translations;";
-                var reader = cmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    if (!_heroesTranslations.ContainsKey(reader.GetString("translation").ToLower()))
-                    {
-                        _heroesTranslations.Add(reader.GetString("translation").ToLower(), reader.GetString("name"));
-
-                    }
-                }
-            }
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = "SELECT map_id, name, short_name FROM maps";
-                var reader = cmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    _maps.Add(reader.GetString("name"), reader.GetString("map_id"));
-                    _mapsShort.Add(reader.GetString("short_name"), reader.GetString("name"));
-
-                }
-            }
-
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = "SELECT name, translation FROM maps_translations";
-                var reader = cmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    _mapsTranslations.Add(reader.GetString("translation"), reader.GetString("name"));
-                }
-            }
-
-
-
-
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = "SELECT hero_name, talent_id, talent_name FROM heroes_data_talents order by talent_id asc";
-                var reader = cmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    var hero = reader.GetString("hero_name");
-                    var talent = reader.GetString("talent_name");
-                    var split = Regex.Split(talent, @"(?<!^)(?=[A-Z])");
-
-                    if (hero == "" && split.Length > 0)
-                    {
-                        hero = split[0];
-                    }
-                    if (!_talents.ContainsKey(reader.GetString("hero_name") + "|" + reader.GetString("talent_name")))
-                    {
-                        _talents.Add(reader.GetString("hero_name") + "|" + reader.GetString("talent_name"), reader.GetString("talent_id"));
-
-                    }
-                }
-            }
-
-
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = "SELECT name, alt_name, short_name, attribute_id FROM heroes";
-                var reader = cmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    if (_heroesAlt.ContainsKey(reader.GetString("name"))) continue;
-                    var hero = reader.GetString("name");
-                    var alt = reader["alt_name"].Equals(DBNull.Value) ? string.Empty : reader.GetString("alt_name");
+                    var alt = hero.AltName;
 
                     if (alt == "")
                     {
-                        alt = reader.GetString("short_name");
+                        alt = hero.ShortName;
                         alt = char.ToUpper(alt.First()) + alt.Substring(1).ToLower();
 
                     }
-                    _heroesAlt.Add(alt, hero);
-
-                    _heroesAttr.Add(reader.GetString("attribute_id"), reader.GetString("name"));
+                    _heroesAlt.Add(alt, hero.Name);
+                    _heroesAttr.Add(hero.AttributeId, hero.Name);
                 }
             }
 
+            _gameTypes = (await _context.GameTypes.Select(x => new {x.TypeId, x.Name}).ToListAsync())
+                    .ToDictionary(x => x.Name.Replace(" ", ""), x => x.TypeId.ToString());
 
+            var heroesTranslations = await _context.HeroesTranslations.Select(x => new { x.Translation, x.Name}).ToListAsync();
 
-
-            using (var cmd = conn.CreateCommand())
+            foreach (var translation in heroesTranslations.Where(translation => !_heroesTranslations.ContainsKey(translation.Translation.ToLower())))
             {
-                cmd.CommandText = "SELECT mmr_type_id, name FROM mmr_type_ids";
-                var reader = cmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    _mmrIds.Add(reader.GetString("name"), reader.GetString("mmr_type_id"));
-                }
+                _heroesTranslations.Add(translation.Translation.ToLower(), translation.Name);
             }
 
-            using (var cmd = conn.CreateCommand())
+            var maps = await _context.Maps.Select(x => new { x.MapId, x.Name, x.ShortName }).ToListAsync();
+
+            foreach (var map in maps)
             {
-                cmd.CommandText = "SELECT id, start_date, end_date FROM season_dates;";
-                var reader = cmd.ExecuteReader();
-
-
-                while (reader.Read())
-                {
-                    var dates = new DateTime[2];
-
-                    dates[0] = DateTime.Parse(reader.GetString("start_date"));
-                    dates[1] = DateTime.Parse(reader.GetString("end_date"));
-
-
-                    _seasons.Add(reader.GetString("id"), dates);
-                }
+                _maps.Add(map.Name, map.MapId.ToString());
+                _mapsShort.Add(map.ShortName, map.Name);
             }
 
-            using (var cmd = conn.CreateCommand())
+            _mapsTranslations = (await _context.MapsTranslations.Select(x => new {x.Translation, x.Name}).ToListAsync())
+                    .ToDictionary(x => x.Translation, x => x.Name);
+
+
+            var heroesDataTalents = await _context.HeroesDataTalents.Select(x => new {x.HeroName, x.TalentId, x.TalentName})
+                                            .OrderBy(x => x.TalentId)
+                                            .ToListAsync();
+
+            foreach (var talent in heroesDataTalents.Where(talent => !_talents.ContainsKey(talent.HeroName + "|" + talent.TalentName)))
             {
-
-                cmd.CommandText = "SELECT * FROM replays_not_processed WHERE count_parsed < 3 ORDER BY replayID ASC LIMIT 100";
-                var reader = cmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    var replayId = reader["replayID"].Equals(DBNull.Value) ? string.Empty : reader.GetString("replayID");
-                    if ((reader["replayID"].Equals(DBNull.Value) ? string.Empty : reader.GetString("replayID")) == "") continue;
-                    var ron = new ReplaysNotProcessed
-                    {
-                            replayID = reader.GetString("replayID"),
-                            region = reader.GetString("region"),
-                            game_type = reader.GetString("game_type"),
-                            game_length = reader.GetString("game_length"),
-                            game_date = reader.GetString("game_date"),
-                            game_map = reader.GetString("game_map"),
-                            game_version = reader.GetString("game_version"),
-                            size = reader["size"].Equals(DBNull.Value) ? string.Empty : reader.GetString("size"),
-                            date_parsed = reader["date_parsed"].Equals(DBNull.Value) ? string.Empty : reader.GetString("date_parsed"),
-                            count_parsed = reader.GetString("count_parsed"),
-                            url = reader.GetString("url"),
-                            failure_status = reader["failure_status"].Equals(DBNull.Value) ? string.Empty : reader.GetString("failure_status"),
-                            processed = reader.GetString("processed")
-                    };
-
-                    _notProcessedReplays.Add(replayId, ron);
-
-                }
+                _talents.Add(talent.HeroName + "|" + talent.TalentName, talent.TalentId.ToString());
             }
 
+            _mmrIds = (await _context.MmrTypeIds.Select(x => new { x.MmrTypeId, x.Name }).ToListAsync())
+                    .ToDictionary(x => x.Name, x => x.MmrTypeId.ToString());
 
-            using (var cmd = conn.CreateCommand())
+            var seasonDates = await _context.SeasonDates.Select(x => new {x.Id, x.StartDate, x.EndDate}).ToListAsync();
+
+            foreach (var seasonDate in seasonDates)
             {
-                cmd.CommandText = "SELECT season, game_version FROM season_game_versions";
-                var reader = cmd.ExecuteReader();
+                var dates = new DateTime[2];
 
-                while (reader.Read())
-                {
-                    if (!_seasonsGameVersions.ContainsKey(reader.GetString("game_version")))
-                    {
-                        _seasonsGameVersions.Add(reader.GetString("game_version"), reader.GetString("season"));
+                dates[0] = seasonDate.StartDate;
+                dates[1] = seasonDate.EndDate;
 
-                    }
-                }
+                _seasons.Add(seasonDate.Id.ToString(), dates);
             }
 
-            using (var cmd = conn.CreateCommand())
+            var replaysNotProcessed = await _context.ReplaysNotProcessed.Where(x => x.CountParsed < 3)
+                                              .OrderBy(x => x.ReplayId)
+                                              .Take(100)
+                                              .ToListAsync();
+
+            foreach (var replay in replaysNotProcessed)
             {
-                cmd.CommandText = "SELECT MAX(replayID) as max_replayID FROM replay";
-                var reader = cmd.ExecuteReader();
-
-                while (reader.Read())
+                var ron = new Models.ReplaysNotProcessed
                 {
-                    maxValue = Convert.ToInt32(reader.GetString("max_replayID"));
+                    replayID = replay.ReplayId.ToString(),
+                    region = replay.Region.ToString(),
+                    game_type = replay.GameType,
+                    game_length = replay.GameLength,
+                    game_date = replay.GameDate.ToString(),
+                    game_map = replay.GameMap,
+                    game_version = replay.GameVersion,
+                    size = replay.Size,
+                    date_parsed = replay.DateParsed.ToString(),
+                    count_parsed = replay.CountParsed?.ToString() ?? "",
+                    url = replay.Url,
+                    failure_status = replay.FailureStatus,
+                    processed = replay.Processed
+                };
+                _notProcessedReplays.Add(replay.ReplayId.ToString(), ron);
+            }
+
+            var seasonGameVersions = await _context.SeasonGameVersions.Select(x => new { x.Season, x.GameVersion }).ToListAsync();
+
+            foreach (var version in seasonGameVersions)
+            {
+                if (!_seasonsGameVersions.ContainsKey(version.GameVersion))
+                {
+                    _seasonsGameVersions.Add(version.GameVersion, version.Season.ToString());
                 }
             }
+
+            maxValue = (int) await _context.Replay.MaxAsync(x => x.ReplayId);
+
             RunNotProcessed();
 
-            var notProcessedMaxValue = 0;
+            var notProcessedMaxValue = await _context.ReplaysNotProcessed.MaxAsync(x => x.ReplayId);
 
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = "SELECT MAX(replayID) as max_replayID FROM replays_not_processed";
-                var reader = cmd.ExecuteReader();
-
-                if (reader.HasRows)
-                {
-                    while (reader.Read())
-                    {
-                        var value = reader["max_replayID"].Equals(DBNull.Value) ? string.Empty : reader.GetString("max_replayID");
-                        if (value != "")
-                        {
-                            notProcessedMaxValue = Convert.ToInt32(reader.GetString("max_replayID"));
-                        }
-                    }
-                }
-            }
-            var brawlMaxValue = 0;
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = "SELECT if(MAX(replayID) is null, 0, MAX(replayID)) as max_replayID FROM heroesprofile_brawl.replay";
-                var reader = cmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    brawlMaxValue = Convert.ToInt32(reader.GetString("max_replayID"));
-                }
-            }
-
+            var brawlMaxValue = await _brawlContext.Replay.MaxAsync(x => x.ReplayId);
+            
             maxValue++;
             if (notProcessedMaxValue > maxValue)
             {
@@ -319,13 +183,10 @@ namespace HeroesProfile_Backend
         {
             Parallel.ForEach(
                 _notProcessedReplays.Keys,
-                //new ParallelOptions { MaxDegreeOfParallelism = -1 },
-                //new ParallelOptions { MaxDegreeOfParallelism = 1 },
                 new ParallelOptions { MaxDegreeOfParallelism = 100 },
                 item =>
                 {
-                    //
-                    Console.WriteLine("Running Reply: " + item);
+                    Console.WriteLine("Running Replay: " + item);
                     
                     var p = _parseStormReplayService.ParseStormReplay(Convert.ToInt64(item), new Uri(_notProcessedReplays[item].url, UriKind.Absolute), _notProcessedReplays[item], _maps, _mapsTranslations, _gameTypes, _talents, _seasonsGameVersions, _mmrIds, _seasons, _heroes, _heroesTranslations, _mapsShort, _mmrIds, _role, _heroesAttr);
                     _replayDataGrabbed.TryAdd(Convert.ToInt64(item), p);
@@ -354,36 +215,6 @@ namespace HeroesProfile_Backend
                     _parseStormReplayService.SaveReplayData(sortedReplayDataGrabbed[item], isBrawl: sortedReplayDataGrabbed[item].OverallData.Mode == "Brawl");
                 });
 
-            /*
-            foreach (var item in sorted_replayData_grabbed.Keys)
-            {
-                if (sorted_replayData_grabbed[item] != null)
-                {
-                    if (!sorted_replayData_grabbed[item].dupe)
-                    {
-                        if (sorted_replayData_grabbed[item].overallData != null)
-                        {
-                            if (sorted_replayData_grabbed[item].overallData.Mode != null)
-                            {
-                                Console.WriteLine("Saving replay data for: " + item);
-                                if (sorted_replayData_grabbed[item].overallData.Mode != "Brawl")
-                                {
-                                    sorted_replayData_grabbed[item].saveReplayData(sorted_replayData_grabbed[item].overallData);
-                                }
-                                else
-                                {
-                                    sorted_replayData_grabbed[item].saveReplayDataBrawl(sorted_replayData_grabbed[item].overallData);
-
-                                }
-                            }
-                        }
-  
-            
-                    }
-                }
-            }
-
-            */
 
         }
         private void RecurseHotsApiCall(int maxValue)
