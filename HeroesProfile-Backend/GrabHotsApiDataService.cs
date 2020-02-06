@@ -3,14 +3,16 @@ using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading.Tasks;
-using MySql.Data.MySqlClient;
 using System.Net;
 using System.IO;
 using System.Text.RegularExpressions;
+using HeroesProfile_Backend.Helpers;
 using HeroesProfile_Backend.Models;
 using HeroesProfileDb.HeroesProfile;
 using HeroesProfileDb.HeroesProfileBrawl;
 using Microsoft.EntityFrameworkCore;
+using Replay = HeroesProfileDb.HeroesProfile.Replay;
+using ReplaysNotProcessed = HeroesProfile_Backend.Models.ReplaysNotProcessed;
 
 namespace HeroesProfile_Backend
 {
@@ -33,7 +35,7 @@ namespace HeroesProfile_Backend
         private Dictionary<string, string> _mmrIds = new Dictionary<string, string>();
         private Dictionary<string, DateTime[]> _seasons = new Dictionary<string, DateTime[]>();
         private Dictionary<string, string> _seasonsGameVersions = new Dictionary<string, string>();
-        private Dictionary<string, Models.ReplaysNotProcessed> _notProcessedReplays = new Dictionary<string, Models.ReplaysNotProcessed>();
+        private List<Models.ReplaysNotProcessed> _unprocessedReplays = new List<ReplaysNotProcessed>();
         private Dictionary<long, HotsApiJSON.ReplayData> _replaysToRun = new Dictionary<long, HotsApiJSON.ReplayData>();
         private ConcurrentDictionary<long, ParsedStormReplay> _replayDataGrabbed = new ConcurrentDictionary<long, ParsedStormReplay>();
 
@@ -141,7 +143,7 @@ namespace HeroesProfile_Backend
                     failure_status = replay.FailureStatus,
                     processed = replay.Processed
                 };
-                _notProcessedReplays.Add(replay.ReplayId.ToString(), ron);
+                _unprocessedReplays.Add(ron);
             }
 
             var seasonGameVersions = await _context.SeasonGameVersions.Select(x => new { x.Season, x.GameVersion }).ToListAsync();
@@ -156,7 +158,7 @@ namespace HeroesProfile_Backend
 
             maxValue = (int) await _context.Replay.MaxAsync(x => x.ReplayId);
 
-            RunNotProcessed();
+            await RunNotProcessed();
 
             var notProcessedMaxValue = await _context.ReplaysNotProcessed.MaxAsync(x => x.ReplayId);
 
@@ -177,21 +179,19 @@ namespace HeroesProfile_Backend
                 maxValue = (brawlMaxValue + 1);
             }
             //maxValue = 15757424;
-            RecurseHotsApiCall(maxValue);
+            await RecurseHotsApiCall(maxValue);
         }
-        private void RunNotProcessed()
+        private async Task RunNotProcessed()
         {
-            Parallel.ForEach(
-                _notProcessedReplays.Keys,
-                new ParallelOptions { MaxDegreeOfParallelism = 100 },
-                item =>
-                {
-                    Console.WriteLine("Running Replay: " + item);
-                    
-                    var p = _parseStormReplayService.ParseStormReplay(Convert.ToInt64(item), new Uri(_notProcessedReplays[item].url, UriKind.Absolute), _notProcessedReplays[item], _maps, _mapsTranslations, _gameTypes, _talents, _seasonsGameVersions, _mmrIds, _seasons, _heroes, _heroesTranslations, _mapsShort, _mmrIds, _role, _heroesAttr);
-                    _replayDataGrabbed.TryAdd(Convert.ToInt64(item), p);
+            await _unprocessedReplays.ForEachAsync(100, async replay =>
+            {
+                Console.WriteLine("Running Replay: " + replay.replayID);
 
-                });
+                var parsedStormReplay = _parseStormReplayService.ParseStormReplay(replay, _maps, _mapsTranslations, _gameTypes,
+                    _talents, _seasonsGameVersions,
+                    _mmrIds, _seasons, _heroes, _heroesTranslations, _mapsShort, _mmrIds, _role, _heroesAttr);
+                _replayDataGrabbed.TryAdd(Convert.ToInt64(replay.replayID), parsedStormReplay);
+            });
 
             var sortedReplayDataGrabbed = new SortedDictionary<long, ParsedStormReplay>();
 
@@ -200,24 +200,18 @@ namespace HeroesProfile_Backend
                 sortedReplayDataGrabbed.Add(item, _replayDataGrabbed[item]);
             }
 
-            Parallel.ForEach(
-                sortedReplayDataGrabbed.Keys,
-                //new ParallelOptions { MaxDegreeOfParallelism = -1 },
-                //new ParallelOptions { MaxDegreeOfParallelism = 1 },
-                new ParallelOptions { MaxDegreeOfParallelism = 1 },
-                item =>
-                {
-                    if (sortedReplayDataGrabbed[item] == null) return;
-                    if (sortedReplayDataGrabbed[item].Dupe) return;
-                    if (sortedReplayDataGrabbed[item].OverallData == null) return;
-                    if (sortedReplayDataGrabbed[item].OverallData.Mode == null) return;
-                    Console.WriteLine("Saving replay data for: " + item);
-                    _parseStormReplayService.SaveReplayData(sortedReplayDataGrabbed[item], isBrawl: sortedReplayDataGrabbed[item].OverallData.Mode == "Brawl");
-                });
-
-
+            await sortedReplayDataGrabbed.ForEachAsync(1, async item =>
+            {
+                if (sortedReplayDataGrabbed[item.Key] == null) return;
+                if (sortedReplayDataGrabbed[item.Key].Dupe) return;
+                if (sortedReplayDataGrabbed[item.Key].OverallData == null) return;
+                if (sortedReplayDataGrabbed[item.Key].OverallData.Mode == null) return;
+                Console.WriteLine("Saving replay data for: " + item);
+                _parseStormReplayService.SaveReplayData(sortedReplayDataGrabbed[item.Key], isBrawl: sortedReplayDataGrabbed[item.Key].OverallData.Mode == "Brawl");
+            });
+            
         }
-        private void RecurseHotsApiCall(int maxValue)
+        private async Task RecurseHotsApiCall(int maxValue)
         {
             try
             {
@@ -229,7 +223,7 @@ namespace HeroesProfile_Backend
 
                 using (var response = (HttpWebResponse)request.GetResponse())
                 {
-                    using var stream = response.GetResponseStream();
+                    await using var stream = response.GetResponseStream();
                     using var reader = new StreamReader(stream);
                     jsonString = reader.ReadToEnd();
                 }
@@ -254,19 +248,18 @@ namespace HeroesProfile_Backend
                     }
                 }
                 var replaysLeftCounter = _replaysToRun.Count;
-                Parallel.ForEach(
-                _replaysToRun.Keys,
-                //new ParallelOptions { MaxDegreeOfParallelism = -1 },
-                //new ParallelOptions { MaxDegreeOfParallelism = 1 },
-                new ParallelOptions { MaxDegreeOfParallelism = 100 },
-                item =>
+
+                await _replaysToRun.ForEachAsync(1, async item =>
                 {
                     replaysLeftCounter--;
 
                     Console.WriteLine("Running Reply: " + item + " - " + replaysLeftCounter + " left to run");
-                    var p = _parseStormReplayService.ParseStormReplay(item, _replaysToRun[item].Url, _replaysToRun[item], _maps, _mapsTranslations, _gameTypes, _talents, _seasonsGameVersions, _mmrIds, _seasons, _heroes, _heroesTranslations, _mapsShort, _mmrIds, _role, _heroesAttr);
-                    _replayDataGrabbed.TryAdd(item, p);
+                    var p = await _parseStormReplayService.ParseStormReplay(item.Key, _replaysToRun[item.Key].Url, _replaysToRun[item.Key],
+                        _maps, _mapsTranslations, _gameTypes, _talents, _seasonsGameVersions, _mmrIds, _seasons, 
+                        _heroes, _heroesTranslations, _mapsShort, _mmrIds, _role, _heroesAttr);
+                    _replayDataGrabbed.TryAdd(item.Key, p);
                 });
+
                 var sortedReplayDataGrabbed = new SortedDictionary<long, ParsedStormReplay>();
 
                 foreach (var item in _replayDataGrabbed.Keys)
@@ -290,33 +283,6 @@ namespace HeroesProfile_Backend
                             _parseStormReplayService.SaveReplayData(sortedReplayDataGrabbed[item], isBrawl: sortedReplayDataGrabbed[item].OverallData.Mode == "Brawl");
 
                     });
-                /*
-                foreach (var item in sorted_replayData_grabbed.Keys)
-                {
-                    if (sorted_replayData_grabbed[item] != null)
-                    {
-                        if (!sorted_replayData_grabbed[item].dupe)
-                        {
-                            if (sorted_replayData_grabbed[item].overallData != null)
-                            {
-                                if (sorted_replayData_grabbed[item].overallData.Mode != null)
-                                {
-                                    Console.WriteLine("Saving replay data for: " + item);
-                                    if (sorted_replayData_grabbed[item].overallData.Mode != "Brawl")
-                                    {
-                                        sorted_replayData_grabbed[item].saveReplayData(sorted_replayData_grabbed[item].overallData);
-                                    }
-                                    else
-                                    {
-                                        sorted_replayData_grabbed[item].saveReplayDataBrawl(sorted_replayData_grabbed[item].overallData);
-
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                */
             }
             catch (Exception e)
             {
@@ -324,7 +290,7 @@ namespace HeroesProfile_Backend
                 {
                     Console.WriteLine("Too many requests  - Sleeping for 10 seconds");
                     System.Threading.Thread.Sleep(10000);
-                    RecurseHotsApiCall(maxValue);
+                    await RecurseHotsApiCall(maxValue);
                 }
             }
 
