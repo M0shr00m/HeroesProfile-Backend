@@ -423,7 +423,7 @@ namespace HeroesProfile_Backend
             return parsedReplay;
         }
 
-        public void SaveReplayData(ParsedStormReplay parsedStormReplay, bool isBrawl)
+        public async Task SaveReplayData(ParsedStormReplay parsedStormReplay, bool isBrawl)
         {
             try
             {
@@ -455,7 +455,6 @@ namespace HeroesProfile_Backend
                             {
                                 badHeroName = true;
                                 break;
-
                             }
                         }
                         else
@@ -463,8 +462,6 @@ namespace HeroesProfile_Backend
                             badHeroName = true;
                             break;
                         }
-
-
                     }
                     else
                     {
@@ -481,13 +478,12 @@ namespace HeroesProfile_Backend
                         }
                     }
 
-
                     if (player.Talents == null) continue;
                     foreach (var talent in player.Talents)
                     {
                         if (!parsedStormReplay.Talents.ContainsKey(player.Hero + "|" + talent))
                         {
-                            parsedStormReplay.Talents.Add(player.Hero + "|" + talent, InsertIntoTalentTable(player.Hero, talent, parsedStormReplay.HeroesAlt, conn));
+                            parsedStormReplay.Talents.Add(player.Hero + "|" + talent, await InsertIntoTalentTable(player.Hero, talent, parsedStormReplay.HeroesAlt));
                         }
                     }
                 }
@@ -510,7 +506,6 @@ namespace HeroesProfile_Backend
                         {
                             teamTwoLevelTenTime = parsedStormReplay.OverallData.TeamExperience[teams][teamTimeSplit].TimeSpan;
                             break;
-
                         }
                     }
                 }
@@ -531,93 +526,71 @@ namespace HeroesProfile_Backend
                     player.Score.FirstToTen = player.Team == 0 ? teamOneFirstToTen : teamTwoFirstToTen;
                 }
 
-
                 if (!badHeroName)
                 {
-
                     foreach (var player in parsedStormReplay.OverallData.Players)
                     {
-                        //Console.WriteLine("Adding Battletag to battletag table for: " + data.Players.Battletag);
-
-                        using (var cmd = conn.CreateCommand())
+                        var battletag = new Battletags
                         {
-                            cmd.CommandText = "INSERT INTO battletags (blizz_id, battletag, region, account_level, latest_game) VALUES " +
-                                              "(" + player.BlizzId + "," +
-                                              "\"" + player.BattletagName + "#" + player.BattletagId + "\"" + "," +
-                                              parsedStormReplay.OverallData.Region + "," +
-                                              player.AccountLevel + "," +
-                                              "\"" + parsedStormReplay.OverallData.Date.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + ")";
+                                BlizzId = (int) player.BlizzId,
+                                Battletag = player.BattletagName + "#" + player.BattletagId,
+                                Region = (sbyte) parsedStormReplay.OverallData.Region,
+                                AccountLevel = (int?) player.AccountLevel,
+                                LatestGame = Convert.ToDateTime(parsedStormReplay.OverallData.Date)
+                        };
+                        await _context.Battletags.Upsert(battletag)
+                                      .WhenMatched(x => new Battletags
+                                      {
+                                              AccountLevel = x.AccountLevel < battletag.AccountLevel
+                                                      ? battletag.AccountLevel
+                                                      : x.AccountLevel,
+                                              LatestGame = x.LatestGame < battletag.LatestGame
+                                                      ? battletag.LatestGame
+                                                      : x.LatestGame
+                                      }).RunAsync();
 
-                            cmd.CommandText += " ON DUPLICATE KEY UPDATE " +
-                                               "account_level = IF(VALUES(account_level) > account_level, VALUES(account_level), account_level), " +
-                                               "latest_game = IF(VALUES(latest_game) > latest_game, VALUES(latest_game), latest_game) ";
-                            cmd.CommandTimeout = 0;
-
-
-
-                            var reader = cmd.ExecuteReader();
-                        }
-                        //Console.WriteLine("Getting player_id for: " + data.Players.Battletag);
-
-
-                        using (var cmd = conn.CreateCommand())
-                        {
-
-                            cmd.CommandText = "SELECT player_id from battletags where battletag = " + "\"" + player.BattletagName + "#" + player.BattletagId + "\"";
-                            cmd.CommandTimeout = 0;
-                            var reader = cmd.ExecuteReader();
-
-                            while (reader.Read())
-                            {
-                                player.battletag_table_id = reader.GetString("player_id");
-                            }
-                        }
+                        player.battletag_table_id =
+                                (await _context.Battletags.FirstOrDefaultAsync(x =>
+                                        x.Battletag == player.BattletagName + "#" +
+                                        player.BattletagId)).Battletag;
                     }
 
 
-
-                    //Console.WriteLine("Saving Replay Information for:" + data.Id);
-
-                    using (var cmd = conn.CreateCommand())
+                    if (isBrawl)
                     {
-                        if (isBrawl)
+                        await _brawlContext.Replay.AddAsync(new HeroesProfileDb.HeroesProfileBrawl.Replay
                         {
-                            cmd.CommandText = "INSERT INTO heroesprofile_brawl.replay (replayID, game_date, game_length, game_map, game_version, region, date_added) VALUES(" +
-                                              parsedStormReplay.ReplayId + "," +
-                                              "\"" + parsedStormReplay.OverallData.Date.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                                              parsedStormReplay.OverallData.Length.UtcDateTime.TimeOfDay.TotalSeconds + "," +
-                                              parsedStormReplay.Maps[parsedStormReplay.OverallData.Map] + "," +
-                                              "\"" + parsedStormReplay.OverallData.Version + "\"" + "," +
-                                              parsedStormReplay.OverallData.Region + "," +
-                                              "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + ")";
-                        }
-                        else
-                        {
-
-                            cmd.CommandText = "INSERT INTO replay (replayID, parsed_id, game_type, game_date, game_length, game_map, game_version, region, date_added) VALUES(" +
-                                              parsedStormReplay.ReplayId + "," +
-                                              "NULL" + "," +
-                                              parsedStormReplay.GameTypes[parsedStormReplay.OverallData.Mode] + "," +
-                                              "\"" + parsedStormReplay.OverallData.Date.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                                              parsedStormReplay.OverallData.Length.UtcDateTime.TimeOfDay.TotalSeconds + "," +
-                                              parsedStormReplay.Maps[parsedStormReplay.OverallData.Map] + "," +
-                                              "\"" + parsedStormReplay.OverallData.Version + "\"" + "," +
-                                              parsedStormReplay.OverallData.Region + "," +
-                                              "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + ")";
-                        }
-
-                        cmd.CommandTimeout = 0;
-                        //Console.WriteLine(cmd.CommandText);
-                        var reader = cmd.ExecuteReader();
+                                ReplayId = (int) parsedStormReplay.ReplayId,
+                                GameDate = Convert.ToDateTime(parsedStormReplay.OverallData.Date),
+                                GameLength = (short) parsedStormReplay
+                                                     .OverallData.Length.UtcDateTime.TimeOfDay.TotalSeconds,
+                                GameMap = Convert.ToSByte(parsedStormReplay.Maps[parsedStormReplay.OverallData.Map]),
+                                GameVersion = parsedStormReplay.OverallData.Version,
+                                Region = (sbyte) parsedStormReplay.OverallData.Region,
+                                DateAdded = DateTime.Now
+                        });
+                        await _brawlContext.SaveChangesAsync();
                     }
-
-
-                    using (var cmd = conn.CreateCommand())
+                    else
                     {
-                        cmd.CommandText = "DELETE FROM replays_not_processed WHERE replayID = " + parsedStormReplay.ReplayId;
-                        var reader = cmd.ExecuteReader();
+                        await _context.Replay.AddAsync(new Replay
+                        {
+                                ReplayId = (uint) parsedStormReplay.ReplayId,
+                                GameDate = Convert.ToDateTime(parsedStormReplay.OverallData.Date),
+                                ParsedId = null,
+                                GameType = Convert.ToByte(
+                                        parsedStormReplay.GameTypes[parsedStormReplay.OverallData.Mode]),
+                                GameLength = (ushort) parsedStormReplay
+                                                      .OverallData.Length.UtcDateTime.TimeOfDay.TotalSeconds,
+                                GameMap = Convert.ToByte(parsedStormReplay.Maps[parsedStormReplay.OverallData.Map]),
+                                GameVersion = parsedStormReplay.OverallData.Version,
+                                Region = (byte) parsedStormReplay.OverallData.Region,
+                                DateAdded = DateTime.Now
+                        });
+                        await _context.SaveChangesAsync();
                     }
 
+                    await _context.ReplaysNotProcessed.Where(x => x.ReplayId == parsedStormReplay.ReplayId).DeleteAsync();
 
                     //// Add back in when running MMR Recalcs
                     /*
@@ -1065,7 +1038,7 @@ namespace HeroesProfile_Backend
             return value == null ? "NULL" : value.ToString();
         }
 
-        private static void UpdateGlobalHeroData(LambdaJson.ReplayData data, MySqlConnection conn)
+        private async Task UpdateGlobalHeroData(LambdaJson.ReplayData data)
         {
             foreach (var player in data.Players)
             {
@@ -1095,161 +1068,105 @@ namespace HeroesProfile_Backend
                     heroLevel = 20;
                 }
 
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText = "INSERT INTO global_hero_stats (" +
-                                  "game_version, " +
-                                  "game_type, " +
-                                  "league_tier, " +
-                                  "hero_league_tier, " +
-                                  "role_league_tier," +
-                                  "game_map, " +
-                                  "hero_level, " +
-                                  "hero, " +
-                                  "mirror, " +
-                                  "region, " +
-                                  "win_loss, " +
-                                  "game_time, " +
-                                  "kills, " +
-                                  "assists, " +
-                                  "takedowns, " +
-                                  "deaths, " +
-                                  "highest_kill_streak, " +
-                                  "hero_damage, " +
-                                  "siege_damage, " +
-                                  "structure_damage, " +
-                                  "minion_damage, " +
-                                  "creep_damage, " +
-                                  "summon_damage, " +
-                                  "time_cc_enemy_heroes, " +
-                                  "healing, " +
-                                  "self_healing, " +
-                                  "damage_taken, " +
-                                  "experience_contribution, " +
-                                  "town_kills, " +
-                                  "time_spent_dead, " +
-                                  "merc_camp_captures, " +
-                                  "watch_tower_captures, " +
-                                  "protection_allies, " +
-                                  "silencing_enemies, " +
-                                  "rooting_enemies, " +
-                                  "stunning_enemies, " +
-                                  "clutch_heals, " +
-                                  "escapes, " +
-                                  "vengeance, " +
-                                  "outnumbered_deaths, " +
-                                  "teamfight_escapes, " +
-                                  "teamfight_healing, " +
-                                  "teamfight_damage_taken, " +
-                                  "teamfight_hero_damage, " +
-                                  "multikill, " +
-                                  "physical_damage, " +
-                                  "spell_damage, " +
-                                  "regen_globes, " +
-                                  "games_played" +
-                                  ") VALUES (" +
-                                  "\"" + data.Version + "\"" + ",";
-                if (data.Mode != "Brawl")
+                var globalHeroStats = new GlobalHeroStats
                 {
-                    cmd.CommandText += "\"" + data.GameType_id + "\"" + "," +
-                                       "\"" + player.player_league_tier + "\"" + ",";
-                }
-                else
-                {
-                    cmd.CommandText += "\"" + "-1" + "\"" + "," +
-                                       "\"" + "0" + "\"" + "," +
-                                       "\"" + "0" + "\"" + "," +
-                                       "\"" + "0" + "\"" + ",";
-                }
+                    GameVersion = data.Version,
+                    GameType = data.Mode != "Brawl" ? Convert.ToSByte(data.GameType_id) : Convert.ToSByte (-1),
+                    LeagueTier = data.Mode != "Brawl" ? Convert.ToSByte(player.player_league_tier) : Convert.ToSByte(0),
+                    HeroLeagueTier = data.Mode != "Brawl" ? Convert.ToSByte(player.hero_league_tier) : Convert.ToSByte(0),
+                    RoleLeagueTier = data.Mode != "Brawl" ? Convert.ToSByte(player.role_league_tier) : Convert.ToSByte(0),
+                    GameMap = Convert.ToSByte(data.GameMap_id),
+                    HeroLevel = (uint)heroLevel,
+                    Hero = Convert.ToSByte(player.Hero_id),
+                    Mirror = (sbyte)player.Mirror,
+                    Region = Convert.ToSByte(data.Region),
+                    WinLoss = (sbyte)winLoss,
+                    GameTime = (uint?)data.Length.UtcDateTime.TimeOfDay.TotalSeconds,
 
-                cmd.CommandText += "\"" + data.GameMap_id + "\"" + "," +
-                                   "\"" + heroLevel + "\"" + "," +
-                                   "\"" + player.Hero_id + "\"" + "," +
-                                   "\"" + player.Mirror + "\"" + "," +
-                                   "\"" + data.Region + "\"" + "," +
-                                   "\"" + winLoss + "\"" + "," +
+                    Kills = (uint?)player.Score.SoloKills,
+                    Assists = (uint?)player.Score.Assists,
+                    Takedowns = (uint?)player.Score.Takedowns,
+                    Deaths = (uint?)player.Score.Deaths,
+                    HighestKillStreak = (uint?)player.Score.HighestKillStreak,
+                    HeroDamage = (uint?)player.Score.HeroDamage,
+                    SiegeDamage = (uint?)player.Score.SiegeDamage,
+                    StructureDamage = (uint?)player.Score.StructureDamage,
+                    MinionDamage = (uint?)player.Score.MinionDamage,
+                    CreepDamage = (uint?)player.Score.CreepDamage,
+                    SummonDamage = (uint?)player.Score.SummonDamage,
+                    TimeCcEnemyHeroes = (uint?)player.Score.TimeCCdEnemyHeroes_not_null.UtcDateTime.TimeOfDay.TotalSeconds,
+                    Healing = (uint?)player.Score.Healing,
+                    SelfHealing = (uint?)player.Score.SelfHealing,
+                    DamageTaken = (uint?)player.Score.DamageTaken,
+                    ExperienceContribution = (uint?)player.Score.ExperienceContribution,
+                    TownKills = (uint?)player.Score.TownKills,
+                    TimeSpentDead = (uint?)player.Score.TimeSpentDead.UtcDateTime.TimeOfDay.TotalSeconds,
+                    MercCampCaptures = (uint?)player.Score.MercCampCaptures,
+                    WatchTowerCaptures = (uint?)player.Score.WatchTowerCaptures,
+                    ProtectionAllies = (uint?)player.Score.ProtectionGivenToAllies,
+                    SilencingEnemies = (uint?)player.Score.TimeSilencingEnemyHeroes,
+                    RootingEnemies = (uint?)player.Score.TimeRootingEnemyHeroes,
+                    StunningEnemies = (uint?)player.Score.TimeStunningEnemyHeroes,
+                    ClutchHeals = (uint?)player.Score.ClutchHealsPerformed,
+                    Escapes = (uint?)player.Score.EscapesPerformed,
+                    Vengeance = (uint?)player.Score.VengeancesPerformed,
+                    OutnumberedDeaths = (uint?)player.Score.OutnumberedDeaths,
+                    TeamfightEscapes = (uint?)player.Score.TeamfightEscapesPerformed,
+                    TeamfightHealing = (uint?)player.Score.TeamfightHealingDone,
+                    TeamfightDamageTaken = (uint?)player.Score.TeamfightDamageTaken,
+                    TeamfightHeroDamage = (uint?)player.Score.TeamfightHeroDamage,
+                    Multikill = (uint?)player.Score.Multikill,
+                    PhysicalDamage = (uint?)player.Score.PhysicalDamage,
+                    SpellDamage = (uint?)player.Score.SpellDamage,
+                    RegenGlobes = (int?)player.Score.RegenGlobes,
+                    GamesPlayed = 1
+                };
 
-                                   "\"" + data.Length.UtcDateTime.TimeOfDay.TotalSeconds + "\"" + "," +
-                                   CheckIfEmpty(player.Score.SoloKills) + "," +
-                                   CheckIfEmpty(player.Score.Assists) + "," +
-                                   CheckIfEmpty(player.Score.Takedowns) + "," +
-                                   CheckIfEmpty(player.Score.Deaths) + "," +
-                                   CheckIfEmpty(player.Score.HighestKillStreak) + "," +
-                                   CheckIfEmpty(player.Score.HeroDamage) + "," +
-                                   CheckIfEmpty(player.Score.SiegeDamage) + "," +
-                                   CheckIfEmpty(player.Score.StructureDamage) + "," +
-                                   CheckIfEmpty(player.Score.MinionDamage) + "," +
-                                   CheckIfEmpty(player.Score.CreepDamage) + "," +
-                                   CheckIfEmpty(player.Score.SummonDamage) + "," +
-                                   CheckIfEmpty(Convert.ToInt64(player.Score.TimeCCdEnemyHeroes_not_null.UtcDateTime.TimeOfDay.TotalSeconds)) + "," +
-                                   CheckIfEmpty(player.Score.Healing) + "," +
-                                   CheckIfEmpty(player.Score.SelfHealing) + "," +
-                                   CheckIfEmpty(player.Score.DamageTaken) + "," +
-                                   CheckIfEmpty(player.Score.ExperienceContribution) + "," +
-                                   CheckIfEmpty(player.Score.TownKills) + "," +
-                                   CheckIfEmpty(Convert.ToInt64(player.Score.TimeSpentDead.UtcDateTime.TimeOfDay.TotalSeconds)) + "," +
-                                   CheckIfEmpty(player.Score.MercCampCaptures) + "," +
-                                   CheckIfEmpty(player.Score.WatchTowerCaptures) + "," +
-                                   CheckIfEmpty(player.Score.ProtectionGivenToAllies) + "," +
-                                   CheckIfEmpty(player.Score.TimeSilencingEnemyHeroes) + "," +
-                                   CheckIfEmpty(player.Score.TimeRootingEnemyHeroes) + "," +
-                                   CheckIfEmpty(player.Score.TimeStunningEnemyHeroes) + "," +
-                                   CheckIfEmpty(player.Score.ClutchHealsPerformed) + "," +
-                                   CheckIfEmpty(player.Score.EscapesPerformed) + "," +
-                                   CheckIfEmpty(player.Score.VengeancesPerformed) + "," +
-                                   CheckIfEmpty(player.Score.OutnumberedDeaths) + "," +
-                                   CheckIfEmpty(player.Score.TeamfightEscapesPerformed) + "," +
-                                   CheckIfEmpty(player.Score.TeamfightHealingDone) + "," +
-                                   CheckIfEmpty(player.Score.TeamfightDamageTaken) + "," +
-                                   CheckIfEmpty(player.Score.TeamfightHeroDamage) + "," +
-
-                                   CheckIfEmpty(player.Score.Multikill) + "," +
-                                   CheckIfEmpty(player.Score.PhysicalDamage) + "," +
-                                   CheckIfEmpty(player.Score.SpellDamage) + "," +
-                                   CheckIfEmpty(player.Score.RegenGlobes) + "," +
-                                   1 + ")";
-
-
-                cmd.CommandText += " ON DUPLICATE KEY UPDATE " +
-                                   "game_time = game_time + VALUES(game_time), " +
-                                   "kills = kills + VALUES(kills), " +
-                                   "assists = assists + VALUES(assists), " +
-                                   "takedowns = takedowns + VALUES(takedowns), " +
-                                   "deaths = deaths + VALUES(deaths), " +
-                                   "highest_kill_streak = highest_kill_streak + VALUES(highest_kill_streak), " +
-                                   "hero_damage = hero_damage + VALUES(hero_damage), " +
-                                   "siege_damage = siege_damage + VALUES(siege_damage), " +
-                                   "structure_damage = structure_damage + VALUES(structure_damage), " +
-                                   "minion_damage = minion_damage + VALUES(minion_damage), " +
-                                   "creep_damage = creep_damage + VALUES(creep_damage), " +
-                                   "summon_damage = summon_damage + VALUES(summon_damage), " +
-                                   "time_cc_enemy_heroes = time_cc_enemy_heroes + VALUES(time_cc_enemy_heroes), " +
-                                   "healing = healing + VALUES(healing), " +
-                                   "self_healing = self_healing + VALUES(self_healing), " +
-                                   "damage_taken = damage_taken + VALUES(damage_taken), " +
-                                   "experience_contribution = experience_contribution + VALUES(experience_contribution), " +
-                                   "town_kills = town_kills + VALUES(town_kills), " +
-                                   "time_spent_dead = time_spent_dead + VALUES(time_spent_dead), " +
-                                   "merc_camp_captures = merc_camp_captures + VALUES(merc_camp_captures), " +
-                                   "watch_tower_captures = watch_tower_captures + VALUES(watch_tower_captures), " +
-                                   "protection_allies = protection_allies + VALUES(protection_allies), " +
-                                   "silencing_enemies = silencing_enemies + VALUES(silencing_enemies), " +
-                                   "rooting_enemies = rooting_enemies + VALUES(rooting_enemies), " +
-                                   "stunning_enemies = stunning_enemies + VALUES(stunning_enemies), " +
-                                   "clutch_heals = clutch_heals + VALUES(clutch_heals), " +
-                                   "escapes = escapes + VALUES(escapes), " +
-                                   "vengeance = vengeance + VALUES(vengeance), " +
-                                   "outnumbered_deaths = outnumbered_deaths + VALUES(outnumbered_deaths), " +
-                                   "teamfight_escapes = teamfight_escapes + VALUES(teamfight_escapes), " +
-                                   "teamfight_healing = teamfight_healing + VALUES(teamfight_healing), " +
-                                   "teamfight_damage_taken = teamfight_damage_taken + VALUES(teamfight_damage_taken), " +
-                                   "teamfight_hero_damage = teamfight_hero_damage + VALUES(teamfight_hero_damage), " +
-                                   "multikill = multikill + VALUES(multikill), " +
-                                   "physical_damage = physical_damage + VALUES(physical_damage), " +
-                                   "spell_damage = spell_damage + VALUES(spell_damage), " +
-                                   "regen_globes = regen_globes + VALUES(regen_globes), " +
-                                   "games_played = games_played + VALUES(games_played)";
-                //Console.WriteLine(cmd.CommandText);
-                var reader = cmd.ExecuteReader();
+                await _context.GlobalHeroStats.Upsert(globalHeroStats)
+                              .WhenMatched(x => new GlobalHeroStats
+                              {
+                                  GameTime = x.GameTime + globalHeroStats.GameTime,
+                                  Kills = x.Kills + globalHeroStats.Kills,
+                                  Assists = x.Assists + globalHeroStats.Assists,
+                                  Takedowns = x.Takedowns + globalHeroStats.Takedowns,
+                                  Deaths = x.Deaths + globalHeroStats.Deaths,
+                                  HighestKillStreak = x.HighestKillStreak + globalHeroStats.HighestKillStreak,
+                                  HeroDamage = x.HeroDamage + globalHeroStats.HeroDamage,
+                                  SiegeDamage = x.SiegeDamage + globalHeroStats.SiegeDamage,
+                                  StructureDamage = x.StructureDamage + globalHeroStats.StructureDamage,
+                                  MinionDamage = x.MinionDamage + globalHeroStats.MinionDamage,
+                                  CreepDamage = x.CreepDamage + globalHeroStats.CreepDamage,
+                                  SummonDamage = x.SummonDamage + globalHeroStats.SummonDamage,
+                                  TimeCcEnemyHeroes = x.TimeCcEnemyHeroes + globalHeroStats.TimeCcEnemyHeroes,
+                                  Healing = x.Healing + globalHeroStats.Healing,
+                                  SelfHealing = x.SelfHealing + globalHeroStats.SelfHealing,
+                                  DamageTaken = x.DamageTaken + globalHeroStats.DamageTaken,
+                                  ExperienceContribution =
+                                              x.ExperienceContribution + globalHeroStats.ExperienceContribution,
+                                  TownKills = x.TownKills + globalHeroStats.TownKills,
+                                  TimeSpentDead = x.TimeSpentDead + globalHeroStats.TimeSpentDead,
+                                  MercCampCaptures = x.MercCampCaptures + globalHeroStats.MercCampCaptures,
+                                  WatchTowerCaptures = x.WatchTowerCaptures + globalHeroStats.WatchTowerCaptures,
+                                  ProtectionAllies = x.ProtectionAllies + globalHeroStats.ProtectionAllies,
+                                  SilencingEnemies = x.SilencingEnemies + globalHeroStats.SilencingEnemies,
+                                  RootingEnemies = x.RootingEnemies + globalHeroStats.RootingEnemies,
+                                  StunningEnemies = x.StunningEnemies + globalHeroStats.StunningEnemies,
+                                  ClutchHeals = x.ClutchHeals + globalHeroStats.ClutchHeals,
+                                  Escapes = x.Escapes + globalHeroStats.Escapes,
+                                  Vengeance = x.Vengeance + globalHeroStats.Vengeance,
+                                  OutnumberedDeaths = x.OutnumberedDeaths + globalHeroStats.OutnumberedDeaths,
+                                  TeamfightEscapes = x.TeamfightEscapes + globalHeroStats.TeamfightEscapes,
+                                  TeamfightHealing = x.TeamfightHealing + globalHeroStats.TeamfightHealing,
+                                  TeamfightDamageTaken =
+                                              x.TeamfightDamageTaken + globalHeroStats.TeamfightDamageTaken,
+                                  TeamfightHeroDamage =
+                                              x.TeamfightHeroDamage + globalHeroStats.TeamfightHeroDamage,
+                                  Multikill = x.Multikill + globalHeroStats.Multikill,
+                                  PhysicalDamage = x.PhysicalDamage + globalHeroStats.PhysicalDamage,
+                                  SpellDamage = x.SpellDamage + globalHeroStats.SpellDamage,
+                                  RegenGlobes = x.RegenGlobes + globalHeroStats.RegenGlobes,
+                                  GamesPlayed = x.GamesPlayed + globalHeroStats.GamesPlayed,
+                              }).RunAsync();
             }
         }
         private int InsertTalentCombo(string hero, int levelOne, int levelFour, int levelSeven, int levelTen, int levelThirteen, int levelSixteen, int levelTwenty)
@@ -1957,7 +1874,7 @@ namespace HeroesProfile_Backend
             }
         }
 
-        private static string InsertIntoTalentTable(string hero, string talentName, Dictionary<string, string> heroesAlt, MySqlConnection conn)
+        public async Task<string> InsertIntoTalentTable(string hero, string talentName, Dictionary<string, string> heroesAlt)
         {
             if (hero == "")
             {
@@ -1965,61 +1882,46 @@ namespace HeroesProfile_Backend
                 hero = heroesAlt.ContainsKey(split[0]) ? heroesAlt[split[0]] : split[0];
             }
 
-            var id = "";
-            using (var cmd = conn.CreateCommand())
+            var existing = await _context.HeroesDataTalents.FirstOrDefaultAsync(x => x.HeroName == hero &&
+                                                                        x.TalentName == talentName);
+            if (existing != null) return existing.TalentId.ToString();
+
+            var talents = new HeroesDataTalents
             {
-                cmd.CommandText =
-                        "INSERT IGNORE INTO heroes_data_talents (hero_name, short_name, attribute_id, title, talent_name, description, status, hotkey, cooldown, mana_cost, sort, level, icon) VALUES " +
-                        "(" +
-                        "\"" + hero + "\"" + "," +
-                        "\"" + "" + "\"" + "," +
-                        "\"" + "" + "\"" + "," +
-                        "\"" + "" + "\"" + "," +
-                        "\"" + talentName + "\"" + "," +
-                        "\"" + "" + "\"" + "," +
-                        "\"" + "" + "\"" + "," +
-                        "\"" + "" + "\"" + "," +
-                        "\"" + "" + "\"" + "," +
-                        "\"" + "" + "\"" + "," +
-                        "\"" + "" + "\"" + "," +
-                        0 + "," +
-                        "\"" + "" + "\"" +
-                        ")";
+                    HeroName = hero,
+                    TalentName = talentName,
+                    ShortName = "",
+                    AttributeId = "",
+                    Title = "",
+                    Description = "",
+                    Status = "",
+                    Hotkey = "",
+                    Cooldown = "",
+                    ManaCost = "",
+                    Sort = "",
+                    Icon = ""
 
-                cmd.CommandTimeout = 0;
+            };
 
-                cmd.ExecuteReader();
-            }
+            await _context.HeroesDataTalents.AddAsync(talents);
+            await _context.SaveChangesAsync();
+            return talents.TalentId.ToString();
 
-
-            using (var cmd = conn.CreateCommand())
-            {
-
-                cmd.CommandText = "SELECT talent_id from heroes_data_talents where hero_name = " + "\"" + hero + "\"" + " AND talent_name = " + "\"" + talentName + "\"" + "  order by talent_id asc";
-                cmd.CommandTimeout = 0;
-                var reader = cmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    id = reader.GetString("talent_id");
-                }
-            }
-
-            return id;
         }
 
-        private static void InsertUrlIntoReplayUrls(ParsedStormReplay parsedStormReplay, MySqlConnection conn)
+        private async Task InsertUrlIntoReplayUrls(ParsedStormReplay parsedStormReplay)
         {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "INSERT INTO replay_urls (replayID, game_date, game_type, url) VALUES (" +
-                              "\"" + parsedStormReplay.ReplayId + "\"" + "," +
-                              "\"" + parsedStormReplay.OverallData.Date.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                              "\"" + parsedStormReplay.OverallData.GameType_id + "\"" + "," +
-                              "\"" + parsedStormReplay.ReplayUrl + "\"" + ")";
-            cmd.ExecuteReader();
+            await _context.ReplayUrls.AddAsync(new ReplayUrls
+            {
+                    ReplayId = (int) parsedStormReplay.ReplayId,
+                    GameDate = Convert.ToDateTime(parsedStormReplay.OverallData.Date),
+                    GameType = Convert.ToSByte(parsedStormReplay.OverallData.GameType_id),
+                    Url = parsedStormReplay.ReplayUrl.ToString()
+            });
+            await _context.SaveChangesAsync();
         }
 
-        private string SaveToSeasonGameVersion(DateTime gameDate, string gameVersion, ParsedStormReplay parsedStormReplay, MySqlConnection conn)
+        private async Task<string> SaveToSeasonGameVersion(DateTime gameDate, string gameVersion, ParsedStormReplay parsedStormReplay)
         {
             var season = "";
 
@@ -2028,57 +1930,22 @@ namespace HeroesProfile_Backend
                 season = s;
             }
 
-            using (var cmd = conn.CreateCommand())
+            var existing = await _context.SeasonGameVersions.FirstOrDefaultAsync(x => x.Season == Convert.ToInt32(season) &&
+                                                                                     x.GameVersion == gameVersion &&
+                                                                                     x.DateAdded == DateTime.Now);
+            if (existing == null)
             {
-                cmd.CommandText = "INSERT IGNORE INTO season_game_versions (season, game_version, date_added) VALUES (" +
-                    season + "," +
-                    "\"" + gameVersion + "\"" + "," +
-                    "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" +
-                    ")";
-                Console.WriteLine(cmd.CommandText);
-                cmd.ExecuteReader();
+                var version = new SeasonGameVersions
+                {
+                        Season = Convert.ToInt32(season),
+                        GameVersion = gameVersion,
+                        DateAdded = DateTime.Now
+                };
+
+                await _context.SeasonGameVersions.AddAsync(version);
+                await _context.SaveChangesAsync();
             }
             return season;
-        }
-
-        private void InsertIntoReplaysNotProcessed(string replayId, string parsedId, string region, string gameType, string gameLength, string gameDate, string gameMap, string gameVersion,
-                                                   string size, string parsedDate, string url, string processed, string errorMessage)
-        {
-            using var conn = new MySqlConnection(_connectionString);
-            conn.Open();
-
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText =
-                    "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES (" +
-                    "\"" + replayId + "\"" + "," +
-                    "\"" + parsedId + "\"" + "," +
-                    "\"" + region + "\"" + "," +
-                    "\"" + gameType + "\"" + "," +
-                    "\"" + gameLength + "\"" + "," +
-                    "\"" + gameDate + "\"" + "," +
-                    "\"" + gameMap + "\"" + "," +
-                    "\"" + gameVersion + "\"" + "," +
-                    "\"" + size + "\"" + "," +
-                    "\"" + parsedDate + "\"" + "," +
-                    "\"" + "1" + "\"" + "," +
-                    "\"" + url + "\"" + "," +
-                    "\"" + processed + "\"" + "," +
-                    "\"" + errorMessage + "\"" + ")";
-            cmd.CommandText += " ON DUPLICATE KEY UPDATE " +
-                               "replayID = VALUES(replayID), " +
-                               "parsedID = VALUES(parsedID), " +
-                               "region = VALUES(region)," +
-                               "game_type = VALUES(game_type)," +
-                               "game_length = VALUES(game_length)," +
-                               "game_date = VALUES(game_date)," +
-                               "game_version = VALUES(game_version)," +
-                               "size = VALUES(size)," +
-                               "date_parsed = VALUES(date_parsed)," +
-                               "count_parsed = count_parsed + VALUES(count_parsed)," +
-                               "url = VALUES(url)," +
-                               "processed = VALUES(processed)," +
-                               "failure_status = VALUES(failure_status)";
-            var reader = cmd.ExecuteReader();
         }
 
         public void ParseStormReplay(Uri replayUrl)
