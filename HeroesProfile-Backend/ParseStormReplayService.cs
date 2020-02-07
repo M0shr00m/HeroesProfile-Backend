@@ -11,6 +11,7 @@ using HeroesProfileDb.HeroesProfile;
 using HeroesProfileDb.HeroesProfileBrawl;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using Z.EntityFramework.Plus;
 using Replay = HeroesProfileDb.HeroesProfile.Replay;
 using ReplaysNotProcessed = HeroesProfile_Backend.Models.ReplaysNotProcessed;
 
@@ -176,11 +177,6 @@ namespace HeroesProfile_Backend
                             }
                             else
                             {
-                                var np = new ReplaysNotProcessed
-                                {
-
-                                };
-
                                 await UpsertNotProcessedReplay((int) replayId, null, (int?) hotsapiData.Region,
                                     hotsapiData.GameType,
                                     hotsapiData.GameLength.ToString(), Convert.ToDateTime(hotsapiData.GameDate),
@@ -204,74 +200,28 @@ namespace HeroesProfile_Backend
                     }
                     else
                     {
-                        using var conn = new MySqlConnection(_connectionString);
-                        conn.Open();
-                        using var cmd = conn.CreateCommand();
-                        cmd.CommandText =
-                                "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
-                                replayId + "," +
-                                "\"" + "NULL" + "\"" + "," +
-                                "\"" + hotsapiData.Region + "\"" + "," +
-                                "\"" + hotsapiData.GameType + "\"" + "," +
-                                "\"" + hotsapiData.GameLength + "\"" + "," +
-                                "\"" + hotsapiData.GameDate.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                                "\"" + hotsapiData.GameMap + "\"" + "," +
-                                "\"" + "" + "\"" + "," +
-                                "\"" + hotsapiData.Size + "\"" + "," +
-                                "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                                1 + "," +
-                                "\"" + replayUrl + "\"" + "," +
-                                "\"" + hotsapiData.Processed + "\"" + "," +
-                                "\"" + "Game Version Null" + "\"" + ")";
-                        cmd.CommandText += " ON DUPLICATE KEY UPDATE " +
-                                           "replayId = VALUES(replayId), " +
-                                           "parsedID = VALUES(parsedID)," +
-                                           "region = VALUES(region)," +
-                                           "game_type = VALUES(game_type)," +
-                                           "game_length = VALUES(game_length)," +
-                                           "game_date = VALUES(game_date)," +
-                                           "game_map = VALUES(game_map)," +
-                                           "game_version = VALUES(game_version)," +
-                                           "size = VALUES(size)," +
-                                           "date_parsed = VALUES(date_parsed)," +
-                                           "count_parsed = count_parsed + VALUES(count_parsed), " +
-                                           "url = VALUES(url)," +
-                                           "processed = VALUES(processed)," +
-                                           "failure_status = VALUES(failure_status)";
-                        cmd.CommandTimeout = 0;
-                        //Console.WriteLine(cmd.CommandText);
-                        var reader = cmd.ExecuteReader();
+                        await UpsertNotProcessedReplay((int)replayId, null, (int?)hotsapiData.Region,
+                                hotsapiData.GameType,
+                                hotsapiData.GameLength.ToString(), Convert.ToDateTime(hotsapiData.GameDate),
+                                hotsapiData.GameMap,
+                                "", hotsapiData.Size.ToString(), DateTime.Now, 1,
+                                replayUrl.ToString(),
+                                hotsapiData.Processed.ToString(), "Game Version Null");
                     }
                 }
             }
             catch (Exception e)
             {
-                using var conn = new MySqlConnection(_connectionString);
-                conn.Open();
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText =
-                        "INSERT IGNORE INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
-                        replayId + "," +
-                        "\"" + "NULL" + "\"" + "," +
-                        "\"" + 0 + "\"" + "," +
-                        "\"" + "NULL" + "\"" + "," +
-                        "\"" + "NULL" + "\"" + "," +
-                        "\"" + hotsapiData.GameDate.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                        "\"" + "NULL" + "\"" + "," +
-                        "\"" + "NULL" + "\"" + "," +
-                        "\"" + "NULL" + "\"" + "," +
-                        "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                        1 + "," +
-                        "\"" + replayUrl + "\"" + "," +
-                        "\"" + "NULL" + "\"" + "," +
-                        "\"" + e + "\"" + ")";
-                var reader = cmd.ExecuteReader();
+                await InsertNotProcessedReplay((int)replayId, null, 0, null,
+                        null, Convert.ToDateTime(hotsapiData.GameDate), null,
+                        null, null, DateTime.Now, 1, replayUrl.ToString(),
+                        null, e.ToString());
             }
 
             return parsedReplay;
         }
 
-        public ParsedStormReplay ParseStormReplay(ReplaysNotProcessed replay, Dictionary<string, string> maps, Dictionary<string, string> mapsTranslations,
+        public async Task<ParsedStormReplay> ParseStormReplay(ReplaysNotProcessed replay, Dictionary<string, string> maps, Dictionary<string, string> mapsTranslations,
                                 Dictionary<string, string> gameTypes, Dictionary<string, string> talents, Dictionary<string, string> seasonsGameVersions, Dictionary<string, string> mmrIds,
                                 Dictionary<string, DateTime[]> seasons, Dictionary<string, string> heroes, Dictionary<string, string> heroesTranslations, Dictionary<string, string> mapsShort,
                                 Dictionary<string, string> mmrs, Dictionary<string, string> roles, Dictionary<string, string> heroesAttr)
@@ -305,7 +255,7 @@ namespace HeroesProfile_Backend
                 httpWebRequest.Method = "POST";
                 httpWebRequest.Timeout = 1000000;
 
-                using (var streamWriter = new StreamWriter(httpWebRequest.GetRequestStream()))
+                await using (var streamWriter = new StreamWriter(httpWebRequest.GetRequestStream()))
                 {
                     var json = JsonConvert.SerializeObject(new
                     {
@@ -328,78 +278,13 @@ namespace HeroesProfile_Backend
                 }
 
 
-                if (Regex.Match(result, "Error parsing replay: UnexpectedResult").Success)
+                if (Regex.Match(result, "Error parsing replay: UnexpectedResult").Success
+                || Regex.Match(result, "Error parsing replay: SuccessReplayDetail").Success
+                    || Regex.Match(result, "Error parsing replay: ParserException").Success)
                 {
-                    using var conn = new MySqlConnection(_connectionString);
-                    conn.Open();
-                    using var cmd = conn.CreateCommand();
-                    cmd.CommandText =
-                            "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
-                            replayId + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + 0 + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                            1 + "," +
-                            "\"" + replayUrl + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "Error parsing replay: UnexpectedResult" + "\"" + ")";
-                    cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1";
-                    var reader = cmd.ExecuteReader();
-                }
-
-                else if (Regex.Match(result, "Error parsing replay: SuccessReplayDetail").Success)
-                {
-                    using var conn = new MySqlConnection(_connectionString);
-                    conn.Open();
-                    using var cmd = conn.CreateCommand();
-                    cmd.CommandText =
-                            "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
-                            replayId + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + 0 + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                            1 + "," +
-                            "\"" + replayUrl + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "Error parsing replay: SuccessReplayDetail" + "\"" + ")";
-                    cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1";
-                    var reader = cmd.ExecuteReader();
-                }
-                else if (Regex.Match(result, "Error parsing replay: ParserException").Success)
-                {
-                    using var conn = new MySqlConnection(_connectionString);
-                    conn.Open();
-                    using var cmd = conn.CreateCommand();
-                    cmd.CommandText =
-                            "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
-                            replayId + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + 0 + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                            1 + "," +
-                            "\"" + replayUrl + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "Error parsing replay: ParserException" + "\"" + ")";
-                    cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1";
-                    var reader = cmd.ExecuteReader();
+                    await UpsertNotProcessedReplayIncrementCountParsed((int) replayId, null, 0, null, null,
+                            DateTime.Now, null, null, null, DateTime.Now, 1, replayUrl.ToString(), null,
+                            result);
                 }
 
                 else
@@ -419,7 +304,10 @@ namespace HeroesProfile_Backend
                                 player.Hero = heroesTranslations[player.Hero.ToLower()];
                             }
 
-                            player.Score.TimeCCdEnemyHeroes_not_null = DateTimeOffset.TryParse(player.Score.TimeCCdEnemyHeroes, out var dateValue) ? dateValue : DateTimeOffset.Parse("00:00:00");
+                            player.Score.TimeCCdEnemyHeroes_not_null =
+                                    DateTimeOffset.TryParse(player.Score.TimeCCdEnemyHeroes, out var dateValue)
+                                            ? dateValue
+                                            : DateTimeOffset.Parse("00:00:00");
                         }
 
                         if (mapsTranslations.ContainsKey(data.Map))
@@ -484,138 +372,52 @@ namespace HeroesProfile_Backend
 
                             if (!badMap && !badGameType)
                             {
-                                using var conn = new MySqlConnection(_connectionString);
-                                conn.Open();
-                                using var cmd = conn.CreateCommand();
+                                bool dupe;
+
                                 if (data.Mode != "Brawl")
                                 {
-                                    cmd.CommandText = "SELECT replayID FROM replay where replayID = " + replayId;
+                                    dupe = await _context.Replay.AnyAsync(x => x.ReplayId == replayId);
                                 }
                                 else
                                 {
-                                    cmd.CommandText = "SELECT replayID FROM heroesprofile_brawl.replay where replayID = " + replayId;
+                                    dupe = await _brawlContext.Replay.AnyAsync(x => x.ReplayId == replayId);
                                 }
 
-                                var reader = cmd.ExecuteReader();
-
-                                if (reader.HasRows)
-                                {
-                                    parsedReplay.Dupe = true;
-                                }
+                                parsedReplay.Dupe = dupe;
                             }
                             else
                             {
-                                using var conn = new MySqlConnection(_connectionString);
-                                conn.Open();
-                                using var cmd = conn.CreateCommand();
-                                cmd.CommandText =
-                                        "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
-                                        replayId + "," +
-                                        "\"" + "NULL" + "\"" + "," +
-                                        "\"" + 0 + "\"" + "," +
-                                        "\"" + "NULL" + "\"" + "," +
-                                        "\"" + "NULL" + "\"" + "," +
-                                        "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                                        "\"" + "NULL" + "\"" + "," +
-                                        "\"" + "NULL" + "\"" + "," +
-                                        "\"" + "NULL" + "\"" + "," +
-                                        "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                                        1 + "," +
-                                        "\"" + replayUrl + "\"" + "," +
-                                        "\"" + "NULL" + "\"" + "," +
-                                        "\"" + "Map or Game Type Bad" + "\"" + ")";
-                                cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1";
-                                var reader = cmd.ExecuteReader();
+                                await UpsertNotProcessedReplayIncrementCountParsed((int) replayId, null, 0, null, null,
+                                        DateTime.Now, null, null, null, DateTime.Now, 1, replayUrl.ToString(),
+                                        null, "Map or Game Type Bad");
                             }
 
                         }
                         else
                         {
-                            using var conn = new MySqlConnection(_connectionString);
-                            conn.Open();
-                            using var cmd = conn.CreateCommand();
-                            cmd.CommandText =
-                                    "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
-                                    replayId + "," +
-                                    "\"" + "NULL" + "\"" + "," +
-                                    "\"" + 0 + "\"" + "," +
-                                    "\"" + "NULL" + "\"" + "," +
-                                    "\"" + "NULL" + "\"" + "," +
-                                    "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                                    "\"" + "NULL" + "\"" + "," +
-                                    "\"" + "NULL" + "\"" + "," +
-                                    "\"" + "NULL" + "\"" + "," +
-                                    "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                                    1 + "," +
-                                    "\"" + replayUrl + "\"" + "," +
-                                    "\"" + "NULL" + "\"" + "," +
-                                    "\"" + "Map or Game Type Bad" + "\"" + ")";
-                            cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1";
-                            var reader = cmd.ExecuteReader();
+                            await UpsertNotProcessedReplayIncrementCountParsed((int) replayId, null, 0, null, null,
+                                    DateTime.Now, null, null, null, DateTime.Now, 1, replayUrl.ToString(),
+                                    null, "Map or Game Type Bad");
                         }
                     }
                     else
                     {
-                        using var conn = new MySqlConnection(_connectionString);
-                        conn.Open();
-                        using var cmd = conn.CreateCommand();
-                        cmd.CommandText =
-                                "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
-                                replayId + "," +
-                                "\"" + "NULL" + "\"" + "," +
-                                "\"" + 0 + "\"" + "," +
-                                "\"" + "NULL" + "\"" + "," +
-                                "\"" + "NULL" + "\"" + "," +
-                                "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                                "\"" + "NULL" + "\"" + "," +
-                                "\"" + "NULL" + "\"" + "," +
-                                "\"" + "NULL" + "\"" + "," +
-                                "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                                1 + "," +
-                                "\"" + replayUrl + "\"" + "," +
-                                "\"" + "NULL" + "\"" + "," +
-                                "\"" + "Game Version Null" + "\"" + ")";
-                        cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1";
-                        var reader = cmd.ExecuteReader();
+                        await UpsertNotProcessedReplayIncrementCountParsed((int) replayId, null, 0, null, null,
+                                DateTime.Now, null, null, null, DateTime.Now, 1, replayUrl.ToString(),
+                                null, "Game Version Null");
                     }
-
-
-                    //}
-
                 }
 
                 if (!parsedReplay.Dupe) return parsedReplay;
                 {
-                    using var conn = new MySqlConnection(_connectionString);
-                    conn.Open();
-                    using var cmd = conn.CreateCommand();
-                    cmd.CommandText = "DELETE FROM replays_not_processed WHERE replayID = " + replayId;
-                    var reader = cmd.ExecuteReader();
+                    await _context.ReplaysNotProcessed.Where(x => x.ReplayId == replayId).DeleteAsync();
                 }
             }
             catch (Exception e)
             {
-                using var conn = new MySqlConnection(_connectionString);
-                conn.Open();
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText =
-                        "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
-                        replayId + "," +
-                        "\"" + "NULL" + "\"" + "," +
-                        "\"" + 0 + "\"" + "," +
-                        "\"" + "NULL" + "\"" + "," +
-                        "\"" + "NULL" + "\"" + "," +
-                        "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                        "\"" + "NULL" + "\"" + "," +
-                        "\"" + "NULL" + "\"" + "," +
-                        "\"" + "NULL" + "\"" + "," +
-                        "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                        1 + "," +
-                        "\"" + replayUrl + "\"" + "," +
-                        "\"" + "NULL" + "\"" + "," +
-                        "\"" + e + "\"" + ")";
-                cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1";
-                var reader = cmd.ExecuteReader();
+                await UpsertNotProcessedReplayIncrementCountParsed((int)replayId, null, 0, null, null,
+                        DateTime.Now, null, null, null, DateTime.Now, 1, replayUrl.ToString(),
+                        null, e.ToString());
             }
 
             return parsedReplay;
@@ -630,11 +432,12 @@ namespace HeroesProfile_Backend
                     parsedStormReplay.Data.GameType_id = "-1";
                 }
                 if (parsedStormReplay.OverallData.Players == null) return;
-                using var conn = new MySqlConnection(_connectionString);
-                conn.Open();
+
                 var badHeroName = false;
                 var badTalentName = false;
+
                 if (parsedStormReplay.OverallData.Players.Length != 10) return;
+
                 foreach (var player in parsedStormReplay.OverallData.Players)
                 {
                     if (player.Hero == null)
@@ -2383,6 +2186,37 @@ namespace HeroesProfile_Backend
                     FailureStatus = row.FailureStatus
                 })
                 .RunAsync();
+        }
+
+        public async Task UpsertNotProcessedReplayIncrementCountParsed(int replayId, string parsedId,
+                                                   int? region, string gameType, string gameLength, DateTime gameDate,
+                                                   string map, string version, string size, DateTime? dateParsed,
+                                                   int? countParsed, string url, string processed, string failureStatus)
+
+        {
+            var row = new HeroesProfileDb.HeroesProfile.ReplaysNotProcessed
+            {
+                    ReplayId = replayId,
+                    ParsedId = parsedId,
+                    Region = region,
+                    GameType = gameType,
+                    GameLength = gameLength,
+                    GameDate = gameDate,
+                    GameMap = map,
+                    GameVersion = version,
+                    Size = size,
+                    DateParsed = dateParsed,
+                    CountParsed = countParsed,
+                    Url = url,
+                    Processed = processed,
+                    FailureStatus = failureStatus
+            };
+            await _context.ReplaysNotProcessed.Upsert(row)
+                          .WhenMatched(x => new HeroesProfileDb.HeroesProfile.ReplaysNotProcessed
+                          {
+                                  CountParsed = x.CountParsed == null ? 1 : x.CountParsed + 1
+                          })
+                          .RunAsync();
         }
     }
 }
