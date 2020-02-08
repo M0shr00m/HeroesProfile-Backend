@@ -629,23 +629,24 @@ namespace HeroesProfile_Backend
                             {
                                 for (var j = 0; j < parsedStormReplay.OverallData.Bans[i].Length; j++)
                                 {
-                                    using var cmd = conn.CreateCommand();
                                     var value = "0";
 
                                     if (parsedStormReplay.OverallData.Bans[i][j] != null)
                                     {
-                                        value = parsedStormReplay.Heroes[parsedStormReplay.OverallData.Bans[i][j].ToString()];
+                                        value = parsedStormReplay.Heroes[
+                                                parsedStormReplay.OverallData.Bans[i][j].ToString()];
                                     }
 
-                                    cmd.CommandText = "INSERT INTO replay_bans (replayID, team, hero) VALUES(" +
-                                                      parsedStormReplay.ReplayId + "," +
-                                                      i + "," +
-                                                      value + ")";
-                                    cmd.CommandTimeout = 0;
-                                    //Console.WriteLine(cmd.CommandText);
-                                    var reader = cmd.ExecuteReader();
+                                    await _context.ReplayBans.AddAsync(new ReplayBans
+                                    {
+                                            ReplayId = (int) parsedStormReplay.ReplayId,
+                                            Team = (byte) i,
+                                            Hero = Convert.ToUInt32(value)
+                                    });
                                 }
                             }
+
+                            await _context.SaveChangesAsync();
                         }
 
 
@@ -653,34 +654,35 @@ namespace HeroesProfile_Backend
                         {
                             for (var j = 0; j < parsedStormReplay.OverallData.TeamExperience[i].Length; j++)
                             {
-                                using var cmd = conn.CreateCommand();
-                                cmd.CommandText = "INSERT into replay_experience_breakdown (replayID, team, team_level, timestamp, structureXP, creepXP, heroXP, minionXP, trickXP, totalXP) VALUES(" +
-                                                  "\"" + parsedStormReplay.ReplayId + "\"" + "," +
-                                                  "\"" + i + "\"" + "," +
-                                                  "\"" + parsedStormReplay.OverallData.TeamExperience[i][j].TeamLevel + "\"" + "," +
-                                                  "\"" + parsedStormReplay.OverallData.TeamExperience[i][j].TimeSpan.ToString("HH:mm:ss") + "\"" + "," +
-                                                  "\"" + parsedStormReplay.OverallData.TeamExperience[i][j].StructureXp + "\"" + "," +
-                                                  "\"" + parsedStormReplay.OverallData.TeamExperience[i][j].CreepXp + "\"" + "," +
-                                                  "\"" + parsedStormReplay.OverallData.TeamExperience[i][j].HeroXp + "\"" + "," +
-                                                  "\"" + parsedStormReplay.OverallData.TeamExperience[i][j].MinionXp + "\"" + "," +
-                                                  "\"" + parsedStormReplay.OverallData.TeamExperience[i][j].TrickleXp + "\"" + "," +
-                                                  "\"" + parsedStormReplay.OverallData.TeamExperience[i][j].TotalXp + "\"" + ")";
-                                cmd.CommandText += " ON DUPLICATE KEY UPDATE " +
-                                                   "replayID = VALUES(replayID), " +
-                                                   "team = VALUES(team), " +
-                                                   "team_level = VALUES(team_level)," +
-                                                   "timestamp = VALUES(timestamp), " +
-                                                   "structureXP = VALUES(structureXP), " +
-                                                   "creepXP = VALUES(creepXP), " +
-                                                   "heroXP = VALUES(heroXP), " +
-                                                   "minionXP = VALUES(minionXP), " +
-                                                   "trickXP = VALUES(trickXP), " +
-                                                   "totalXP = VALUES(totalXP)";
-
-                                //Console.WriteLine(cmd.CommandText);
-                                var writeReader = cmd.ExecuteReader();
+                                var breakdown = new ReplayExperienceBreakdown
+                                {
+                                        ReplayId = (int) parsedStormReplay.ReplayId,
+                                        Team = (sbyte) i,
+                                        TeamLevel = (int) parsedStormReplay.OverallData.TeamExperience[i][j].TeamLevel,
+                                        Timestamp = parsedStormReplay.OverallData.TeamExperience[i][j].TimeSpan
+                                                                     .ToString("HH:mm:ss"),
+                                        StructureXp = parsedStormReplay.OverallData.TeamExperience[i][j].StructureXp,
+                                        CreepXp = parsedStormReplay.OverallData.TeamExperience[i][j].CreepXp,
+                                        HeroXp = parsedStormReplay.OverallData.TeamExperience[i][j].HeroXp,
+                                        MinionXp = parsedStormReplay.OverallData.TeamExperience[i][j].MinionXp,
+                                        TrickXp = parsedStormReplay.OverallData.TeamExperience[i][j].TrickleXp,
+                                        TotalXp = parsedStormReplay.OverallData.TeamExperience[i][j].TotalXp
+                                };
+                                await _context.ReplayExperienceBreakdown.Upsert(breakdown)
+                                              .WhenMatched(x => new ReplayExperienceBreakdown
+                                              {
+                                                      ReplayId = breakdown.ReplayId,
+                                                      Team = breakdown.Team,
+                                                      TeamLevel = breakdown.TeamLevel,
+                                                      Timestamp = breakdown.Timestamp,
+                                                      StructureXp = breakdown.StructureXp,
+                                                      CreepXp = breakdown.CreepXp,
+                                                      HeroXp = breakdown.HeroXp,
+                                                      MinionXp = breakdown.MinionXp,
+                                                      TrickXp = breakdown.TrickXp,
+                                                      TotalXp = breakdown.TotalXp
+                                              }).RunAsync();
                             }
-
                         }
                     }
 
@@ -693,7 +695,6 @@ namespace HeroesProfile_Backend
                             parsedStormReplay.OverallData.Players[i].MasteyTauntTier = item.TierLevel;
                             break;
                         }
-
 
                         for (var j = 0; j < parsedStormReplay.OverallData.Players.Length; j++)
                         {
@@ -711,205 +712,235 @@ namespace HeroesProfile_Backend
                     foreach (var player in parsedStormReplay.OverallData.Players)
                     {
                         player.WinnerValue = player.Winner ? "1" : "0";
-                        //Console.WriteLine("Saving Player Information for:" + data.Players.Battletag);
-                        using (var cmd = conn.CreateCommand())
+
+                        if (isBrawl)
                         {
-                            cmd.CommandText = "INSERT INTO " + playerTable + " (" +
-                                              "replayID, " +
-                                              "blizz_id, " +
-                                              "battletag, " +
-                                              "hero, " +
-                                              "hero_level, " +
-                                              "mastery_taunt, " +
-                                              "team, " +
-                                              "winner, " +
-                                              "party " +
-                                              ") VALUES(" +
-                                              parsedStormReplay.ReplayId + "," +
-                                              player.BlizzId + "," +
-                                              player.battletag_table_id + "," +
-                                              parsedStormReplay.Heroes[player.Hero] + "," +
-                                              player.HeroLevel + "," +
-                                              player.MasteyTauntTier + "," +
-                                              player.Team + "," +
-                                              player.WinnerValue + "," +
-                                              player.Party +
-                                              ")";
-                            cmd.CommandTimeout = 0;
-                            var reader = cmd.ExecuteReader();
+                            await _brawlContext.Player.AddAsync(new HeroesProfileDb.HeroesProfileBrawl.Player
+                            {
+                                    ReplayId = (int) parsedStormReplay.ReplayId,
+                                    BlizzId = (int) player.BlizzId,
+                                    Battletag = player.battletag_table_id,
+                                    Hero = Convert.ToSByte(parsedStormReplay.Heroes[player.Hero]),
+                                    HeroLevel = (short) player.HeroLevel,
+                                    MasteryTaunt = (short) player.MasteyTauntTier,
+                                    Team = (sbyte) player.Team,
+                                    Winner = Convert.ToSByte(player.WinnerValue),
+                                    Party = player.Party.ToString()
+                            });
+                        }
+                        else
+                        {
+                            await _context.Player.AddAsync(new HeroesProfileDb.HeroesProfile.Player
+                            {
+                                    ReplayId = (uint) parsedStormReplay.ReplayId,
+                                    BlizzId = (uint) player.BlizzId,
+                                    Battletag = player.battletag_table_id,
+                                    Hero = Convert.ToByte(parsedStormReplay.Heroes[player.Hero]),
+                                    HeroLevel = (ushort) player.HeroLevel,
+                                    MasteryTaunt = (ushort?) player.MasteyTauntTier,
+                                    Team = (byte) player.Team,
+                                    Winner = Convert.ToByte(player.WinnerValue),
+                                    Party = player.Party.ToString()
+                            });
                         }
 
-                        //Console.WriteLine("Saving Score Information for:" + data.Players.Battletag);
                         if (player.Score != null)
                         {
-                            using var cmd = conn.CreateCommand();
-                            cmd.CommandText = "INSERT INTO " + scoresTable + " (" +
-                                              "replayID, " +
-                                              "battletag, " +
-                                              "level, " +
-                                              "kills, " +
-                                              "assists, " +
-                                              "takedowns, " +
-                                              "deaths, " +
-                                              "highest_kill_streak, " +
-                                              "hero_damage, " +
-                                              "siege_damage, " +
-                                              "structure_damage, " +
-                                              "minion_damage, " +
-                                              "creep_damage, " +
-                                              "summon_damage, " +
-                                              "time_cc_enemy_heroes, " +
-                                              "healing, " +
-                                              "self_healing, " +
-                                              "damage_taken, " +
-                                              "experience_contribution, " +
-                                              "town_kills, " +
-                                              "time_spent_dead, " +
-                                              "merc_camp_captures, " +
-                                              "watch_tower_captures, " +
-                                              "meta_experience, " +
-                                              "match_award, " +
-                                              "protection_allies, " +
-                                              "silencing_enemies, " +
-                                              "rooting_enemies, " +
-                                              "stunning_enemies, " +
-                                              "clutch_heals, " +
-                                              "escapes, " +
-                                              "vengeance, " +
-                                              "outnumbered_deaths, " +
-                                              "teamfight_escapes, " +
-                                              "teamfight_healing, " +
-                                              "teamfight_damage_taken, " +
-                                              "teamfight_hero_damage, " +
-                                              "multikill, " +
-                                              "physical_damage, " +
-                                              "spell_damage," +
-                                              "regen_globes," +
-                                              "first_to_ten" +
-                                              ") VALUES(" +
-                                              parsedStormReplay.ReplayId + "," +
-                                              player.battletag_table_id + "," +
-                                              CheckIfEmpty(player.Score.Level) + "," +
-                                              CheckIfEmpty(player.Score.SoloKills) + "," +
-                                              CheckIfEmpty(player.Score.Assists) + "," +
-                                              CheckIfEmpty(player.Score.Takedowns) + "," +
-                                              CheckIfEmpty(player.Score.Deaths) + "," +
-                                              CheckIfEmpty(player.Score.HighestKillStreak) + "," +
-                                              CheckIfEmpty(player.Score.HeroDamage) + "," +
-                                              CheckIfEmpty(player.Score.SiegeDamage) + "," +
-                                              CheckIfEmpty(player.Score.StructureDamage) + "," +
-                                              CheckIfEmpty(player.Score.MinionDamage) + "," +
-                                              CheckIfEmpty(player.Score.CreepDamage) + "," +
-                                              CheckIfEmpty(player.Score.SummonDamage) + "," +
-                                              CheckIfEmpty(Convert.ToInt64(player.Score.TimeCCdEnemyHeroes_not_null.UtcDateTime.TimeOfDay.TotalSeconds)) + "," +
-                                              CheckIfEmpty(player.Score.Healing) + "," +
-                                              CheckIfEmpty(player.Score.SelfHealing) + "," +
-                                              CheckIfEmpty(player.Score.DamageTaken) + "," +
-                                              CheckIfEmpty(player.Score.ExperienceContribution) + "," +
-                                              CheckIfEmpty(player.Score.TownKills) + "," +
-                                              CheckIfEmpty(Convert.ToInt64(player.Score.TimeSpentDead.UtcDateTime.TimeOfDay.TotalSeconds)) + "," +
-
-                                              CheckIfEmpty(player.Score.MercCampCaptures) + "," +
-                                              CheckIfEmpty(player.Score.WatchTowerCaptures) + "," +
-                                              CheckIfEmpty(player.Score.MetaExperience) + ",";
-                            if (player.Score.MatchAwards.Length > 0)
+                            if (isBrawl)
                             {
-                                cmd.CommandText += player.Score.MatchAwards[0] + ",";
-
-                            }
-                            else
-                            {
-                                cmd.CommandText += "NULL" + ",";
-                            }
-
-                            cmd.CommandText += CheckIfEmpty(player.Score.ProtectionGivenToAllies) + "," +
-                                               CheckIfEmpty(player.Score.TimeSilencingEnemyHeroes) + "," +
-                                               CheckIfEmpty(player.Score.TimeRootingEnemyHeroes) + "," +
-                                               CheckIfEmpty(player.Score.TimeStunningEnemyHeroes) + "," +
-                                               CheckIfEmpty(player.Score.ClutchHealsPerformed) + "," +
-                                               CheckIfEmpty(player.Score.EscapesPerformed) + "," +
-                                               CheckIfEmpty(player.Score.VengeancesPerformed) + "," +
-                                               CheckIfEmpty(player.Score.OutnumberedDeaths) + "," +
-                                               CheckIfEmpty(player.Score.TeamfightEscapesPerformed) + "," +
-                                               CheckIfEmpty(player.Score.TeamfightHealingDone) + "," +
-                                               CheckIfEmpty(player.Score.TeamfightDamageTaken) + "," +
-                                               CheckIfEmpty(player.Score.TeamfightHeroDamage) + "," +
-
-                                               CheckIfEmpty(player.Score.Multikill) + "," +
-                                               CheckIfEmpty(player.Score.PhysicalDamage) + "," +
-                                               CheckIfEmpty(player.Score.SpellDamage) + "," +
-                                               CheckIfEmpty(player.Score.RegenGlobes) + "," +
-                                               CheckIfEmpty(player.Score.FirstToTen) + ")";
-
-
-
-
-                            cmd.CommandTimeout = 0;
-                            //Console.WriteLine(cmd.CommandText);
-                            var reader = cmd.ExecuteReader();
-                        }
-
-                        //Console.WriteLine("Saving Talent Information for:" + data.Players.Battletag);
-                        using (var cmd = conn.CreateCommand())
-                        {
-                            if (player.Talents != null)
-                            {
-                                cmd.CommandText = player.Talents.Length switch
+                                await _brawlContext.Scores.AddAsync(new HeroesProfileDb.HeroesProfileBrawl.Scores
                                 {
-                                        0 => ("INSERT INTO " + talentsTable + " (replayID, battletag, level_one, level_four, level_seven, level_ten, level_thirteen, level_sixteen, level_twenty) VALUES(" +
-                                              parsedStormReplay.ReplayId + "," + player.battletag_table_id + "," + "NULL" + "," + "NULL" + "," + "NULL" + "," + "NULL" + "," + "NULL" + "," + "NULL" +
-                                              "," + "NULL" + ")"),
-                                        1 => ("INSERT INTO " + talentsTable + " (replayID, battletag, level_one) VALUES(" + parsedStormReplay.ReplayId + "," + player.battletag_table_id + "," +
-                                              parsedStormReplay.Talents[player.Hero + "|" + player.Talents[0]] + ")"),
-                                        2 => ("INSERT INTO " + talentsTable + " (replayID, battletag, level_one, level_four) VALUES(" + parsedStormReplay.ReplayId + "," + player.battletag_table_id + "," +
-                                              parsedStormReplay.Talents[player.Hero + "|" + player.Talents[0]] + "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[1]] + ")"),
-                                        3 => ("INSERT INTO " + talentsTable + " (replayID, battletag, level_one, level_four, level_seven) VALUES(" + parsedStormReplay.ReplayId + "," + player.battletag_table_id +
-                                              "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[0]] + "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[1]] + "," +
-                                              parsedStormReplay.Talents[player.Hero + "|" + player.Talents[2]] + ")"),
-                                        4 => ("INSERT INTO " + talentsTable + " (replayID, battletag, level_one, level_four, level_seven, level_ten) VALUES(" + parsedStormReplay.ReplayId + "," +
-                                              player.battletag_table_id + "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[0]] + "," +
-                                              parsedStormReplay.Talents[player.Hero + "|" + player.Talents[1]] + "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[2]] + "," +
-                                              parsedStormReplay.Talents[player.Hero + "|" + player.Talents[3]] + ")"),
-                                        5 => ("INSERT INTO " + talentsTable + " (replayID, battletag, level_one, level_four, level_seven, level_ten, level_thirteen) VALUES(" + parsedStormReplay.ReplayId + "," +
-                                              player.battletag_table_id + "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[0]] + "," +
-                                              parsedStormReplay.Talents[player.Hero + "|" + player.Talents[1]] + "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[2]] + "," +
-                                              parsedStormReplay.Talents[player.Hero + "|" + player.Talents[3]] + "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[4]] + ")"),
-                                        6 => ("INSERT INTO " + talentsTable + " (replayID, battletag, level_one, level_four, level_seven, level_ten, level_thirteen, level_sixteen) VALUES(" +
-                                              parsedStormReplay.ReplayId + "," + player.battletag_table_id + "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[0]] + "," +
-                                              parsedStormReplay.Talents[player.Hero + "|" + player.Talents[1]] + "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[2]] + "," +
-                                              parsedStormReplay.Talents[player.Hero + "|" + player.Talents[3]] + "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[4]] + "," +
-                                              parsedStormReplay.Talents[player.Hero + "|" + player.Talents[5]] + ")"),
-                                        7 => ("INSERT INTO " + talentsTable + " (replayID, battletag, level_one, level_four, level_seven, level_ten, level_thirteen, level_sixteen, level_twenty) VALUES(" +
-                                              parsedStormReplay.ReplayId + "," + player.battletag_table_id + "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[0]] + "," +
-                                              parsedStormReplay.Talents[player.Hero + "|" + player.Talents[1]] + "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[2]] + "," +
-                                              parsedStormReplay.Talents[player.Hero + "|" + player.Talents[3]] + "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[4]] + "," +
-                                              parsedStormReplay.Talents[player.Hero + "|" + player.Talents[5]] + "," + parsedStormReplay.Talents[player.Hero + "|" + player.Talents[6]] + ")"),
-                                        _ => cmd.CommandText
-                                };
-
-                                cmd.CommandTimeout = 0;
-                                //Console.WriteLine(cmd.CommandText);
-                                var reader = cmd.ExecuteReader();
+                                        ReplayId = (int) parsedStormReplay.ReplayId,
+                                        Battletag = player.battletag_table_id,
+                                        Level = (int) player.Score.Level,
+                                        Kills = (int) player.Score.SoloKills,
+                                        Assists = (int) player.Score.Assists,
+                                        Takedowns = (int) player.Score.Takedowns,
+                                        Deaths = (int) player.Score.Deaths,
+                                        HighestKillStreak = (int) player.Score.HighestKillStreak,
+                                        HeroDamage = (int) player.Score.HeroDamage,
+                                        SiegeDamage = (int) player.Score.SiegeDamage,
+                                        StructureDamage = (int) player.Score.StructureDamage,
+                                        MinionDamage = (int) player.Score.MinionDamage,
+                                        CreepDamage = (int) player.Score.CreepDamage,
+                                        SummonDamage = (int) player.Score.SummonDamage,
+                                        TimeCcEnemyHeroes = (int) player
+                                                                  .Score.TimeCCdEnemyHeroes_not_null.UtcDateTime
+                                                                  .TimeOfDay.TotalSeconds,
+                                        Healing = (int) player.Score.Healing,
+                                        SelfHealing = (int) player.Score.SelfHealing,
+                                        DamageTaken = (int) player.Score.DamageTaken,
+                                        ExperienceContribution = (int) player.Score.ExperienceContribution,
+                                        TownKills = (int) player.Score.TownKills,
+                                        TimeSpentDead =
+                                                (int) player.Score.TimeSpentDead.UtcDateTime.TimeOfDay.TotalSeconds,
+                                        MercCampCaptures = (int) player.Score.MercCampCaptures,
+                                        WatchTowerCaptures = (int) player.Score.WatchTowerCaptures,
+                                        MetaExperience = (int) player.Score.MetaExperience,
+                                        MatchAward = (int) (player.Score.MatchAwards.Length > 0
+                                                ? player.Score.MatchAwards[0]
+                                                : 0),
+                                        ProtectionAllies = (int) player.Score.ProtectionGivenToAllies,
+                                        SilencingEnemies = (int) player.Score.TimeSilencingEnemyHeroes,
+                                        RootingEnemies = (int) player.Score.TimeRootingEnemyHeroes,
+                                        StunningEnemies = (int) player.Score.TimeStunningEnemyHeroes,
+                                        ClutchHeals = (int) player.Score.ClutchHealsPerformed,
+                                        Escapes = (int) player.Score.EscapesPerformed,
+                                        Vengeance = (int) player.Score.VengeancesPerformed,
+                                        OutnumberedDeaths = (int) player.Score.OutnumberedDeaths,
+                                        TeamfightEscapes = (int) player.Score.TeamfightEscapesPerformed,
+                                        TeamfightHealing = (int) player.Score.TeamfightHealingDone,
+                                        TeamfightDamageTaken = (int) player.Score.TeamfightDamageTaken,
+                                        TeamfightHeroDamage = (int) player.Score.TeamfightHeroDamage,
+                                        Multikill = (int) player.Score.Multikill,
+                                        PhysicalDamage = (int) player.Score.PhysicalDamage,
+                                        SpellDamage = (int) player.Score.SpellDamage,
+                                        RegenGlobes = (int) player.Score.RegenGlobes,
+                                        FirstToTen = (int) player.Score.FirstToTen
+                                });
                             }
                             else
                             {
-                                cmd.CommandText = "INSERT INTO " + talentsTable + " (replayID, battletag, level_one, level_four, level_seven, level_ten, level_thirteen, level_sixteen, level_twenty) VALUES(" +
-                                                  parsedStormReplay.ReplayId + "," +
-                                                  player.battletag_table_id + "," +
-                                                  "NULL" + "," +
-                                                  "NULL" + "," +
-                                                  "NULL" + "," +
-                                                  "NULL" + "," +
-                                                  "NULL" + "," +
-                                                  "NULL" + "," +
-                                                  "NULL" + ")";
-
-                                cmd.CommandTimeout = 0;
-                                //Console.WriteLine(cmd.CommandText);
-                                var reader = cmd.ExecuteReader();
+                                await _context.Scores.AddAsync(new HeroesProfileDb.HeroesProfile.Scores
+                                {
+                                        ReplayId = (uint) parsedStormReplay.ReplayId,
+                                        Battletag = player.battletag_table_id,
+                                        Level = (int) player.Score.Level,
+                                        Kills = (int) player.Score.SoloKills,
+                                        Assists = (int) player.Score.Assists,
+                                        Takedowns = (int) player.Score.Takedowns,
+                                        Deaths = (int) player.Score.Deaths,
+                                        HighestKillStreak = (int) player.Score.HighestKillStreak,
+                                        HeroDamage = (int) player.Score.HeroDamage,
+                                        SiegeDamage = (int) player.Score.SiegeDamage,
+                                        StructureDamage = (int) player.Score.StructureDamage,
+                                        MinionDamage = (int) player.Score.MinionDamage,
+                                        CreepDamage = (int) player.Score.CreepDamage,
+                                        SummonDamage = (int) player.Score.SummonDamage,
+                                        TimeCcEnemyHeroes = (int) player
+                                                                  .Score.TimeCCdEnemyHeroes_not_null.UtcDateTime
+                                                                  .TimeOfDay.TotalSeconds,
+                                        Healing = (int) player.Score.Healing,
+                                        SelfHealing = (int) player.Score.SelfHealing,
+                                        DamageTaken = (int) player.Score.DamageTaken,
+                                        ExperienceContribution = (int) player.Score.ExperienceContribution,
+                                        TownKills = (int) player.Score.TownKills,
+                                        TimeSpentDead =
+                                                (int) player.Score.TimeSpentDead.UtcDateTime.TimeOfDay.TotalSeconds,
+                                        MercCampCaptures = (int) player.Score.MercCampCaptures,
+                                        WatchTowerCaptures = (int) player.Score.WatchTowerCaptures,
+                                        MetaExperience = (int) player.Score.MetaExperience,
+                                        MatchAward =
+                                                (player.Score.MatchAwards.Length > 0 ? player.Score.MatchAwards[0] : 0)
+                                                .ToString(),
+                                        ProtectionAllies = (int) player.Score.ProtectionGivenToAllies,
+                                        SilencingEnemies = (int) player.Score.TimeSilencingEnemyHeroes,
+                                        RootingEnemies = (int) player.Score.TimeRootingEnemyHeroes,
+                                        StunningEnemies = (int) player.Score.TimeStunningEnemyHeroes,
+                                        ClutchHeals = (int) player.Score.ClutchHealsPerformed,
+                                        Escapes = (int) player.Score.EscapesPerformed,
+                                        Vengeance = (int) player.Score.VengeancesPerformed,
+                                        OutnumberedDeaths = (int) player.Score.OutnumberedDeaths,
+                                        TeamfightEscapes = (int) player.Score.TeamfightEscapesPerformed,
+                                        TeamfightHealing = (int) player.Score.TeamfightHealingDone,
+                                        TeamfightDamageTaken = (int) player.Score.TeamfightDamageTaken,
+                                        TeamfightHeroDamage = (int) player.Score.TeamfightHeroDamage,
+                                        Multikill = (int) player.Score.Multikill,
+                                        PhysicalDamage = (int) player.Score.PhysicalDamage,
+                                        SpellDamage = (int) player.Score.SpellDamage,
+                                        RegenGlobes = (int) player.Score.RegenGlobes,
+                                        FirstToTen = (sbyte?) player.Score.FirstToTen
+                                });
                             }
-
                         }
+
+                        if (isBrawl)
+                        {
+                            await _brawlContext.Talents.AddAsync(new HeroesProfileDb.HeroesProfileBrawl.Talents
+                            {
+                                    ReplayId = (int) parsedStormReplay.ReplayId,
+                                    Battletag = player.battletag_table_id,
+                                    LevelOne = player.Talents != null && player.Talents.Length > 0
+                                            ? Convert.ToInt32(
+                                                    parsedStormReplay.Talents
+                                                            [player.Hero + "|" + player.Talents[0]])
+                                            : 0,
+                                    LevelFour = player.Talents != null && player.Talents.Length > 1
+                                            ? Convert.ToInt32(
+                                                    parsedStormReplay.Talents
+                                                            [player.Hero + "|" + player.Talents[1]])
+                                            : 0,
+                                    LevelSeven = player.Talents != null && player.Talents.Length > 2
+                                            ? Convert.ToInt32(
+                                                    parsedStormReplay.Talents
+                                                            [player.Hero + "|" + player.Talents[2]])
+                                            : 0,
+                                    LevelTen = player.Talents != null && player.Talents.Length > 3
+                                            ? Convert.ToInt32(
+                                                    parsedStormReplay.Talents
+                                                            [player.Hero + "|" + player.Talents[3]])
+                                            : 0,
+                                    LevelThirteen = player.Talents != null && player.Talents.Length > 4
+                                            ? Convert.ToInt32(
+                                                    parsedStormReplay.Talents
+                                                            [player.Hero + "|" + player.Talents[4]])
+                                            : 0,
+                                    LevelSixteen = player.Talents != null && player.Talents.Length > 5
+                                            ? Convert.ToInt32(
+                                                    parsedStormReplay.Talents
+                                                            [player.Hero + "|" + player.Talents[5]])
+                                            : 0,
+                                    LevelTwenty = player.Talents != null && player.Talents.Length > 6
+                                            ? Convert.ToInt32(
+                                                    parsedStormReplay.Talents
+                                                            [player.Hero + "|" + player.Talents[6]])
+                                            : 0,
+                            });
+                        }
+                        else
+                        {
+                            await _context.Talents.AddAsync(new HeroesProfileDb.HeroesProfile.Talents
+                            {
+                                    ReplayId = (uint) parsedStormReplay.ReplayId,
+                                    Battletag = Convert.ToInt32(player.battletag_table_id),
+                                    LevelOne = player.Talents != null && player.Talents.Length > 0
+                                            ? Convert.ToInt32(
+                                                    parsedStormReplay.Talents
+                                                            [player.Hero + "|" + player.Talents[0]])
+                                            : 0,
+                                    LevelFour = player.Talents != null && player.Talents.Length > 1
+                                            ? Convert.ToInt32(
+                                                    parsedStormReplay.Talents
+                                                            [player.Hero + "|" + player.Talents[1]])
+                                            : 0,
+                                    LevelSeven = player.Talents != null && player.Talents.Length > 2
+                                            ? Convert.ToInt32(
+                                                    parsedStormReplay.Talents
+                                                            [player.Hero + "|" + player.Talents[2]])
+                                            : 0,
+                                    LevelTen = player.Talents != null && player.Talents.Length > 3
+                                            ? Convert.ToInt32(
+                                                    parsedStormReplay.Talents
+                                                            [player.Hero + "|" + player.Talents[3]])
+                                            : 0,
+                                    LevelThirteen = player.Talents != null && player.Talents.Length > 4
+                                            ? Convert.ToInt32(
+                                                    parsedStormReplay.Talents
+                                                            [player.Hero + "|" + player.Talents[4]])
+                                            : 0,
+                                    LevelSixteen = player.Talents != null && player.Talents.Length > 5
+                                            ? Convert.ToInt32(
+                                                    parsedStormReplay.Talents
+                                                            [player.Hero + "|" + player.Talents[5]])
+                                            : 0,
+                                    LevelTwenty = player.Talents != null && player.Talents.Length > 6
+                                            ? Convert.ToInt32(
+                                                    parsedStormReplay.Talents
+                                                            [player.Hero + "|" + player.Talents[6]])
+                                            : 0
+                            });
+                        }
+
                     }
                     //saveMasterMMRData(data, conn);
 
@@ -918,34 +949,34 @@ namespace HeroesProfile_Backend
                         if (Convert.ToInt32(parsedStormReplay.SeasonsGameVersions[parsedStormReplay.OverallData.Version]) < 13) return;
                         if (isBrawl)
                         {
-                            UpdateGlobalHeroData(parsedStormReplay.OverallData, conn);
-                            UpdateGlobalTalentData(parsedStormReplay, conn);
-                            UpdateGlobalTalentDataDetails(parsedStormReplay, conn);
+                            await UpdateGlobalHeroData(parsedStormReplay.OverallData);
+                            UpdateGlobalTalentData(parsedStormReplay);
+                            UpdateGlobalTalentDataDetails(parsedStormReplay);
                         }
                         else
                         {
-                            UpdateGameModeTotalGames(Convert.ToInt32(parsedStormReplay.SeasonsGameVersions[parsedStormReplay.OverallData.Version]), parsedStormReplay, conn);
-                            InsertUrlIntoReplayUrls(parsedStormReplay, conn);
+                            UpdateGameModeTotalGames(Convert.ToInt32(parsedStormReplay.SeasonsGameVersions[parsedStormReplay.OverallData.Version]), parsedStormReplay);
+                            await InsertUrlIntoReplayUrls(parsedStormReplay);
                         }
                         
                     }
                     else
                     {
-                        var season = SaveToSeasonGameVersion(DateTime.Parse(parsedStormReplay.OverallData.Date.ToString("yyyy-MM-dd HH:mm:ss")), parsedStormReplay.OverallData.Version, parsedStormReplay, conn);
+                        var season = await SaveToSeasonGameVersion(Convert.ToDateTime(parsedStormReplay.OverallData.Date), parsedStormReplay.OverallData.Version, parsedStormReplay);
                         parsedStormReplay.SeasonsGameVersions.Add(parsedStormReplay.OverallData.Version, season);
                         //Save Game Version to table
                         //Add it to dic
                         if (Convert.ToInt32(parsedStormReplay.SeasonsGameVersions[parsedStormReplay.OverallData.Version]) < 13) return;
                         if (isBrawl)
                         {
-                            UpdateGlobalHeroData(parsedStormReplay.OverallData, conn);
-                            UpdateGlobalTalentData(parsedStormReplay, conn);
-                            UpdateGlobalTalentDataDetails(parsedStormReplay, conn);
+                            await UpdateGlobalHeroData(parsedStormReplay.OverallData);
+                            UpdateGlobalTalentData(parsedStormReplay);
+                            UpdateGlobalTalentDataDetails(parsedStormReplay);
                         }
                         else
                         {
-                            UpdateGameModeTotalGames(Convert.ToInt32(parsedStormReplay.SeasonsGameVersions[parsedStormReplay.OverallData.Version]), parsedStormReplay, conn);
-                            InsertUrlIntoReplayUrls(parsedStormReplay, conn);
+                            UpdateGameModeTotalGames(Convert.ToInt32(parsedStormReplay.SeasonsGameVersions[parsedStormReplay.OverallData.Version]), parsedStormReplay);
+                            await InsertUrlIntoReplayUrls(parsedStormReplay);
                         }
 
                     }
