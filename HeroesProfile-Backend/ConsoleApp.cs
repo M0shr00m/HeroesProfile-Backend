@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 
 namespace HeroesProfile_Backend
@@ -14,14 +15,14 @@ namespace HeroesProfile_Backend
             _grabHotsApiDataService = grabHotsApiDataService;
         }
         
-        public void Run()
+        public async Task Run()
         {
             
             while (true)
             {
                 try
                 {
-                    _grabHotsApiDataService.GrabHotsApiData();
+                    await _grabHotsApiDataService.GrabHotsApiData();
 
                 }
                 catch (Exception e)

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Threading.Tasks;
 using HeroesProfile_Backend.Models;
 using HeroesProfileDb.HeroesProfile;
 using HeroesProfileDb.HeroesProfileBrawl;
@@ -12,7 +13,7 @@ namespace HeroesProfile_Backend
 {
     class Program
     {
-        static void Main(string[] args)
+        private static async Task Main(string[] args)
         {
             // Create service collection and configure our services
             var services = ConfigureServices();
@@ -20,7 +21,7 @@ namespace HeroesProfile_Backend
             var serviceProvider = services.BuildServiceProvider();
    
             // Kick off our actual code
-            serviceProvider.GetService<ConsoleApp>().Run();
+            await serviceProvider.GetService<ConsoleApp>().Run();
         }
         
         private static IServiceCollection ConfigureServices()

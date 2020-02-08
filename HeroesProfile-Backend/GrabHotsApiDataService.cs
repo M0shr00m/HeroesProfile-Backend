@@ -187,7 +187,7 @@ namespace HeroesProfile_Backend
             {
                 Console.WriteLine("Running Replay: " + replay.replayID);
 
-                var parsedStormReplay = _parseStormReplayService.ParseStormReplay(replay, _maps, _mapsTranslations, _gameTypes,
+                var parsedStormReplay = await _parseStormReplayService.ParseStormReplay(replay, _maps, _mapsTranslations, _gameTypes,
                     _talents, _seasonsGameVersions,
                     _mmrIds, _seasons, _heroes, _heroesTranslations, _mapsShort, _mmrIds, _role, _heroesAttr);
                 _replayDataGrabbed.TryAdd(Convert.ToInt64(replay.replayID), parsedStormReplay);
@@ -207,7 +207,7 @@ namespace HeroesProfile_Backend
                 if (sortedReplayDataGrabbed[item.Key].OverallData == null) return;
                 if (sortedReplayDataGrabbed[item.Key].OverallData.Mode == null) return;
                 Console.WriteLine("Saving replay data for: " + item);
-                _parseStormReplayService.SaveReplayData(sortedReplayDataGrabbed[item.Key], isBrawl: sortedReplayDataGrabbed[item.Key].OverallData.Mode == "Brawl");
+                await _parseStormReplayService.SaveReplayData(sortedReplayDataGrabbed[item.Key], isBrawl: sortedReplayDataGrabbed[item.Key].OverallData.Mode == "Brawl");
             });
             
         }
@@ -267,22 +267,14 @@ namespace HeroesProfile_Backend
                     sortedReplayDataGrabbed.Add(item, _replayDataGrabbed[item]);
                 }
 
-
-                Parallel.ForEach(
-                    sortedReplayDataGrabbed.Keys,
-                    //new ParallelOptions { MaxDegreeOfParallelism = -1 },
-                    //new ParallelOptions { MaxDegreeOfParallelism = 1 },
-                    new ParallelOptions { MaxDegreeOfParallelism = 1 },
-                    item =>
-                    {
-                        if (sortedReplayDataGrabbed[item] == null) return;
-                        if (sortedReplayDataGrabbed[item].Dupe) return;
-                        if (sortedReplayDataGrabbed[item].OverallData == null) return;
-                        if (sortedReplayDataGrabbed[item].OverallData.Mode == null) return;
+                await sortedReplayDataGrabbed.ForEachAsync(1, async item =>
+                        {
+                        if (item.Value == null) return;
+                        if (item.Value.Dupe) return;
+                        if (item.Value.OverallData?.Mode == null) return;
                         Console.WriteLine("Saving replay data for: " + item);
-                            _parseStormReplayService.SaveReplayData(sortedReplayDataGrabbed[item], isBrawl: sortedReplayDataGrabbed[item].OverallData.Mode == "Brawl");
-
-                    });
+                            await _parseStormReplayService.SaveReplayData(item.Value, item.Value.OverallData.Mode == "Brawl");
+                        });
             }
             catch (Exception e)
             {
