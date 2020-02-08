@@ -47,7 +47,7 @@ namespace HeroesProfile_Backend
             _context = context;
             _brawlContext = brawlContext;
         }
-        
+
         public async Task GrabHotsApiData()
         {
             var maxValue = 0;
@@ -164,7 +164,6 @@ namespace HeroesProfile_Backend
 
             var brawlMaxValue = await _brawlContext.Replay.MaxAsync(x => x.ReplayId);
             
-            maxValue++;
             if (notProcessedMaxValue > maxValue)
             {
                 maxValue = notProcessedMaxValue;
@@ -176,8 +175,10 @@ namespace HeroesProfile_Backend
             }
             else if (brawlMaxValue > maxValue)
             {
-                maxValue = (brawlMaxValue + 1);
+                maxValue = brawlMaxValue;
             }
+            maxValue++;
+
             //maxValue = 15757424;
             await RecurseHotsApiCall(maxValue);
         }
@@ -209,7 +210,7 @@ namespace HeroesProfile_Backend
                 Console.WriteLine("Saving replay data for: " + item);
                 await _parseStormReplayService.SaveReplayData(sortedReplayDataGrabbed[item.Key], isBrawl: sortedReplayDataGrabbed[item.Key].OverallData.Mode == "Brawl");
             });
-            
+
         }
         private async Task RecurseHotsApiCall(int maxValue)
         {
@@ -255,7 +256,7 @@ namespace HeroesProfile_Backend
 
                     Console.WriteLine("Running Reply: " + item + " - " + replaysLeftCounter + " left to run");
                     var p = await _parseStormReplayService.ParseStormReplay(item.Key, _replaysToRun[item.Key].Url, _replaysToRun[item.Key],
-                        _maps, _mapsTranslations, _gameTypes, _talents, _seasonsGameVersions, _mmrIds, _seasons, 
+                        _maps, _mapsTranslations, _gameTypes, _talents, _seasonsGameVersions, _mmrIds, _seasons,
                         _heroes, _heroesTranslations, _mapsShort, _mmrIds, _role, _heroesAttr);
                     _replayDataGrabbed.TryAdd(item.Key, p);
                 });
