@@ -287,6 +287,31 @@ namespace HeroesProfile_Backend
                             result);
                 }
 
+                else if (Regex.Match(result, "Error parsing replay: ParserException").Success)
+                {
+                    using var conn = new MySqlConnection(_connectionString);
+                    conn.Open();
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText =
+                            "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
+                            replayId + "," +
+                            "\"" + "NULL" + "\"" + "," +
+                            "\"" + 0 + "\"" + "," +
+                            "\"" + "NULL" + "\"" + "," +
+                            "\"" + "NULL" + "\"" + "," +
+                            "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
+                            "\"" + "NULL" + "\"" + "," +
+                            "\"" + "NULL" + "\"" + "," +
+                            "\"" + "NULL" + "\"" + "," +
+                            "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
+                            1 + "," +
+                            "\"" + replayUrl + "\"" + "," +
+                            "\"" + "NULL" + "\"" + "," +
+                            "\"" + "Error parsing replay: ParserException" + "\"" + ")";
+                    cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1, failure_status = " + "\"" + result + "\"";
+                    var reader = cmd.ExecuteReader();
+                }
+
                 else
                 {
                     var data = LambdaJson.ReplayData.FromJson(globalJson);
