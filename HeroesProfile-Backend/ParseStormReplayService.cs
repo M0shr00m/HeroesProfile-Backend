@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Net;
 using System.IO;
 using System.Linq;
-using MySql.Data.MySqlClient;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using HeroesProfile_Backend.Models;
@@ -279,8 +278,7 @@ namespace HeroesProfile_Backend
 
 
                 if (Regex.Match(result, "Error parsing replay: UnexpectedResult").Success
-                || Regex.Match(result, "Error parsing replay: SuccessReplayDetail").Success
-                    || Regex.Match(result, "Error parsing replay: ParserException").Success)
+                || Regex.Match(result, "Error parsing replay: SuccessReplayDetail").Success)
                 {
                     await UpsertNotProcessedReplayIncrementCountParsed((int) replayId, null, 0, null, null,
                             DateTime.Now, null, null, null, DateTime.Now, 1, replayUrl.ToString(), null,
@@ -289,27 +287,10 @@ namespace HeroesProfile_Backend
 
                 else if (Regex.Match(result, "Error parsing replay: ParserException").Success)
                 {
-                    using var conn = new MySqlConnection(_connectionString);
-                    conn.Open();
-                    using var cmd = conn.CreateCommand();
-                    cmd.CommandText =
-                            "INSERT INTO replays_not_processed (replayId, parsedID, region, game_type, game_length, game_date, game_map, game_version, size, date_parsed, count_parsed, url, processed, failure_status) VALUES(" +
-                            replayId + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + 0 + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\"" + "," +
-                            1 + "," +
-                            "\"" + replayUrl + "\"" + "," +
-                            "\"" + "NULL" + "\"" + "," +
-                            "\"" + "Error parsing replay: ParserException" + "\"" + ")";
-                    cmd.CommandText += " ON DUPLICATE KEY UPDATE count_parsed = count_parsed + 1, failure_status = " + "\"" + result + "\"";
-                    var reader = cmd.ExecuteReader();
+
+                    await UpsertNotProcessedReplayUpdateCountParsedFailureStatus((int)replayId, null, 0, null, null,
+                            DateTime.Now, null, null, null, DateTime.Now, 1, replayUrl.ToString(), null,
+                            result);
                 }
 
                 else
@@ -577,7 +558,8 @@ namespace HeroesProfile_Backend
                         player.battletag_table_id =
                                 (await _context.Battletags.FirstOrDefaultAsync(x =>
                                         x.Battletag == player.BattletagName + "#" +
-                                        player.BattletagId)).Battletag;
+                                        player.BattletagId
+                                     && x.Region == Convert.ToSByte(parsedStormReplay.OverallData.Region))).PlayerId.ToString();
                     }
 
 
@@ -1807,6 +1789,37 @@ namespace HeroesProfile_Backend
                           .WhenMatched(x => new HeroesProfileDb.HeroesProfile.ReplaysNotProcessed
                           {
                                   CountParsed = x.CountParsed == null ? 1 : x.CountParsed + 1
+                          })
+                          .RunAsync();
+        }
+        public async Task UpsertNotProcessedReplayUpdateCountParsedFailureStatus(int replayId, string parsedId,
+                                                                       int? region, string gameType, string gameLength, DateTime gameDate,
+                                                                       string map, string version, string size, DateTime? dateParsed,
+                                                                       int? countParsed, string url, string processed, string failureStatus)
+
+        {
+            var row = new HeroesProfileDb.HeroesProfile.ReplaysNotProcessed
+            {
+                    ReplayId = replayId,
+                    ParsedId = parsedId,
+                    Region = region,
+                    GameType = gameType,
+                    GameLength = gameLength,
+                    GameDate = gameDate,
+                    GameMap = map,
+                    GameVersion = version,
+                    Size = size,
+                    DateParsed = dateParsed,
+                    CountParsed = countParsed,
+                    Url = url,
+                    Processed = processed,
+                    FailureStatus = failureStatus
+            };
+            await _context.ReplaysNotProcessed.Upsert(row)
+                          .WhenMatched(x => new HeroesProfileDb.HeroesProfile.ReplaysNotProcessed
+                          {
+                                  CountParsed = x.CountParsed == null ? 1 : x.CountParsed + 1,
+                                  FailureStatus = row.FailureStatus
                           })
                           .RunAsync();
         }
